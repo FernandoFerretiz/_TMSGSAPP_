@@ -3,6 +3,7 @@ import '../../../core/network/api_client.dart';
 import '../models/active_trip_response.dart';
 import '../models/location_update.dart';
 import '../models/trip_status_request.dart';
+import '../models/trip_status_response.dart';
 
 class TripService {
   final ApiClient _apiClient;
@@ -15,11 +16,15 @@ class TripService {
         response.data as Map<String, dynamic>);
   }
 
-  /// Changes the trip status (started, finished, etc.).
-  /// Evidence files are sent as multipart/form-data when present.
-  Future<void> changeStatus(int tripId, TripStatusRequest request) async {
+  /// Changes the trip status (started, finished, etc.) and returns the full
+  /// API response, including [TripStatusResponse.trackingEnabled] and
+  /// [TripStatusResponse.shouldStopTracking].
+  Future<TripStatusResponse> changeStatus(
+      int tripId, TripStatusRequest request) async {
+    final Response response;
+
     if (request.evidenceFilePaths.isEmpty) {
-      await _apiClient.dio.post(
+      response = await _apiClient.dio.post(
         '/api/mobile/trips/$tripId/status',
         data: {
           'status': request.status,
@@ -42,12 +47,14 @@ class TripService {
         ),
       });
 
-      await _apiClient.dio.post(
+      response = await _apiClient.dio.post(
         '/api/mobile/trips/$tripId/status',
         data: formData,
         options: Options(contentType: 'multipart/form-data'),
       );
     }
+
+    return TripStatusResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Sends a single location update to the server.

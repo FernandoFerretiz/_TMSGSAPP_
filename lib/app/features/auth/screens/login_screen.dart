@@ -59,8 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             // Gradient background
             const DecoratedBox(
-              decoration:
-                  BoxDecoration(gradient: AppColors.backgroundGradient),
+              decoration: BoxDecoration(gradient: AppColors.backgroundGradient),
               child: SizedBox.expand(),
             ),
 
@@ -124,11 +123,10 @@ class _LoginScreenState extends State<LoginScreen> {
               width: 1.5,
             ),
           ),
-          child: const Icon(
-            Icons.local_shipping_rounded,
-            color: Colors.white,
-            size: 42,
-          ),
+          child: Image.asset(
+              'assets/images/logo1x1.png',
+              fit: BoxFit.contain,
+            ),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -178,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Accede con tus credenciales de operador',
+                  'Accede con tus credenciales',
                   style: TextStyle(
                     color: AppColors.textMedium,
                     fontSize: 13.5,
@@ -240,8 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Remember me
                 GestureDetector(
-                  onTap: () =>
-                      setState(() => _rememberMe = !_rememberMe),
+                  onTap: () => setState(() => _rememberMe = !_rememberMe),
                   behavior: HitTestBehavior.opaque,
                   child: Row(
                     children: [
@@ -317,8 +314,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Login button
                 Obx(() => GradientButton(
-                      onPressed:
-                          _auth.isLoading.value ? null : _submit,
+                      onPressed: _auth.isLoading.value ? null : _submit,
                       isLoading: _auth.isLoading.value,
                       label: 'Iniciar sesión',
                     )),

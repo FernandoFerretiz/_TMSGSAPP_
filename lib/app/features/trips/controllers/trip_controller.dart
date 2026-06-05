@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import '../../../config/routes/route_names.dart';
-import '../../../core/network/token_manager.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../location/controllers/location_controller.dart';
+import '../../location/services/tracking_service.dart';
 import '../data/trip_service.dart';
 import '../models/active_trip_response.dart';
 import '../models/trip_model.dart';
@@ -13,8 +13,9 @@ import '../models/trip_status_request.dart';
 
 class TripController extends GetxController {
   final TripService _tripService;
+  final TrackingService _trackingService;
 
-  TripController(this._tripService);
+  TripController(this._tripService, this._trackingService);
 
   final isLoading = false.obs;
   final isChangingStatus = false.obs;
@@ -44,16 +45,14 @@ class TripController extends GetxController {
       final result = await _tripService.getActiveTrip();
       _activeTripResponse.value = result;
 
-      // If trip is already started and tracking is enabled, resume the
-      // background location service without re-requesting start confirmation.
+      // Resume background location if the trip is in a trackable state
+      // (started or arrived) and the server says tracking should be enabled.
       if (result.hasActiveTrip &&
           result.trackingEnabled &&
-          result.trip?.isStarted == true) {
-        final token = TokenManager.token;
-        if (token != null && result.trip != null) {
-          await Get.find<LocationController>()
-              .startTracking(tripId: result.trip!.id, token: token);
-        }
+          result.trip?.requiresTracking == true) {
+        final started =
+            await _trackingService.startTracking(tripId: result.trip!.id);
+        _syncLocationController(started);
       }
     } on DioException catch (e) {
       errorMessage.value = 'No se pudo cargar el viaje activo.';
@@ -78,7 +77,7 @@ class TripController extends GetxController {
     errorMessage.value = '';
     try {
       final position = await _getCurrentPosition();
-      await _tripService.changeStatus(
+      final response = await _tripService.changeStatus(
         trip.id,
         TripStatusRequest(
           status: 'started',
@@ -89,11 +88,11 @@ class TripController extends GetxController {
         ),
       );
 
-      // Start background location tracking.
-      final token = TokenManager.token;
-      if (token != null) {
-        await Get.find<LocationController>()
-            .startTracking(tripId: trip.id, token: token);
+      // Only start background tracking if the server confirms it.
+      if (response.trackingEnabled) {
+        final started =
+            await _trackingService.startTracking(tripId: trip.id);
+        _syncLocationController(started);
       }
 
       await loadActiveTrip();
@@ -123,7 +122,7 @@ class TripController extends GetxController {
     errorMessage.value = '';
     try {
       final position = await _getCurrentPosition();
-      await _tripService.changeStatus(
+      final response = await _tripService.changeStatus(
         trip.id,
         TripStatusRequest(
           status: 'finished',
@@ -134,8 +133,12 @@ class TripController extends GetxController {
         ),
       );
 
-      // Stop background location — trip is done.
-      await Get.find<LocationController>().stopTracking();
+      // Stop tracking when the trip finishes or when the server requests it.
+      if (response.shouldStopTracking || true) {
+        await _trackingService.stopTracking();
+        _syncLocationController(false);
+      }
+
       await loadActiveTrip();
       return true;
     } on DioException catch (e) {
@@ -152,9 +155,6 @@ class TripController extends GetxController {
 
   // ── Report incident (stub — endpoint TBD) ─────────────────────────────
 
-  // if (authController.hasPermission('trip.update')) {
-  //   await tripController.reportIncident(notes: notes, files: files);
-  // }
   Future<void> reportIncident({
     required String notes,
     List<String> evidenceFilePaths = const [],
@@ -173,6 +173,15 @@ class TripController extends GetxController {
   void goToChangeStatus() => Get.toNamed(RouteNames.changeStatus);
 
   // ── Private ────────────────────────────────────────────────────────────
+
+  /// Keeps [LocationController.isTracking] in sync after TrackingService calls.
+  void _syncLocationController(bool tracking) {
+    try {
+      Get.find<LocationController>().isTracking.value = tracking;
+    } catch (_) {
+      // LocationController may not be registered in all contexts.
+    }
+  }
 
   Future<Position?> _getCurrentPosition() async {
     try {

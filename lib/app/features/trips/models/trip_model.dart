@@ -21,7 +21,11 @@ class TripModel {
 
   bool get isAssigned => status == 'assigned';
   bool get isStarted => status == 'started';
+  bool get isArrived => status == 'arrived';
   bool get isFinished => status == 'finished';
+
+  /// True when the trip is in an active tracking state (started or arrived).
+  bool get requiresTracking => isStarted || isArrived;
 
   factory TripModel.fromJson(Map<String, dynamic> json) => TripModel(
         id: json['id'] as int,

@@ -44,7 +44,7 @@ class TmsLocationHandler extends TaskHandler {
     );
   }
 
-  // Called every `eventAction` interval (default 30 s).
+  // Called every `eventAction` interval (30 s).
   @override
   void onRepeatEvent(DateTime timestamp) {
     _fetchAndSend();
@@ -74,25 +74,33 @@ class TmsLocationHandler extends TaskHandler {
         recordedAt: DateTime.now().toIso8601String(),
       );
 
-      await _dio!.post(
+      final response = await _dio!.post(
         '/api/mobile/trips/$_tripId/locations',
         data: update.toJson(),
       );
+
+      // Server can signal that tracking should stop (e.g. trip finished remotely).
+      final data = response.data;
+      if (data is Map && data['should_stop_tracking'] == true) {
+        if (kDebugMode) debugPrint('[LocationHandler] server requested stop tracking');
+        await FlutterForegroundTask.stopService();
+      }
     } catch (e) {
+      // Keep service alive even if a single location request fails.
       if (kDebugMode) debugPrint('[LocationHandler] error: $e');
     }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main-isolate service — used by LocationController.
+// Main-isolate service — used by TrackingService → LocationController.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class LocationService {
   bool _tracking = false;
   bool get isTracking => _tracking;
 
-  /// Call once at app start (in main() or GlobalBinding).
+  /// Call once at app start via TrackingService.initialize().
   void initialize() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
@@ -117,34 +125,17 @@ class LocationService {
     );
   }
 
-  /// Requests location permission. Returns true if granted.
-  Future<bool> requestPermission() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    return permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
-  }
-
-  Future<LocationPermission> getPermissionStatus() =>
-      Geolocator.checkPermission();
-
   /// Starts the background location foreground service for [tripId].
-  /// [token] is the current Bearer token — it's passed into the task isolate.
-  /// Returns true if the service started successfully.
+  ///
+  /// Permission checks must be done by [TrackingService] before calling this.
+  /// [token] is passed into the task isolate via the foreground-task data store.
   Future<bool> startTracking({
     required int tripId,
     required String token,
   }) async {
     if (_tracking) return true;
 
-    final hasPermission = await requestPermission();
-    if (!hasPermission) return false;
-
-    // Pass trip context into the task isolate via foreground-task data store.
+    // Persist trip context so the isolate can read it on start.
     await FlutterForegroundTask.saveData(
         key: 'trip_id', value: tripId.toString());
     await FlutterForegroundTask.saveData(key: 'token', value: token);
@@ -160,7 +151,7 @@ class LocationService {
     return _tracking;
   }
 
-  /// Stops the background location service.
+  /// Stops the background location service and clears persisted data.
   Future<void> stopTracking() async {
     if (!_tracking) return;
     await FlutterForegroundTask.stopService();
@@ -168,7 +159,7 @@ class LocationService {
     _tracking = false;
   }
 
-  /// Updates the notification text (e.g. when trip status changes).
+  /// Updates the persistent notification text (e.g. when trip status changes).
   Future<void> updateNotification(String text) async {
     await FlutterForegroundTask.updateService(
       notificationTitle: 'TMS — Viaje en curso',
