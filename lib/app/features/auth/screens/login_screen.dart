@@ -113,20 +113,28 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 76,
-          height: 76,
+          width: 100,
+          height: 100,
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.11),
-            borderRadius: BorderRadius.circular(20),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.22),
-              width: 1.5,
+              color: Colors.white,
+              width: 2,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Image.asset(
-              'assets/images/logo1x1.png',
-              fit: BoxFit.contain,
-            ),
+            'assets/images/logo1x1.png',
+            fit: BoxFit.contain,
+          ),
         ),
         const SizedBox(height: 12),
         const Text(
