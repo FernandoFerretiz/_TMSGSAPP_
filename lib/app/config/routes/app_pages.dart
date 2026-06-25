@@ -4,6 +4,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/home/bindings/home_binding.dart';
 import '../../features/trips/screens/start_trip_screen.dart';
+import '../../features/trips/screens/trip_detail_screen.dart';
 // DashboardBinding is declared as `part of dashboard` inside dashboard_screen.dart
 import '../../features/dashboard/views/screens/dashboard_screen.dart';
 import 'route_names.dart';
@@ -39,6 +40,10 @@ class AppPages {
       name: _Paths.dashboard,
       page: () => const DashboardScreen(),
       binding: DashboardBinding(),
+    ),
+    GetPage(
+      name: _Paths.tripDetail,
+      page: () => const TripDetailScreen(),
     ),
   ];
 }

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../config/routes/route_names.dart';
 import '../../../core/network/token_manager.dart';
 import '../../../core/storage/secure_storage_service.dart';
+import '../../../services/push_notification_service.dart';
 import '../data/auth_service.dart';
 import '../models/auth_response.dart';
 import '../models/login_request.dart';
@@ -104,6 +105,12 @@ class AuthController extends GetxController {
         await storageService.deleteToken();
       }
 
+      // Register FCM token now that we have a valid Bearer token.
+      // Runs in the background — never blocks the login flow.
+      Get.find<PushNotificationService>()
+          .registerTokenWithBackend()
+          .ignore();
+
       Get.offAllNamed(RouteNames.home);
     } on DioException catch (e, st) {
       _printDioError(e, st);
@@ -123,9 +130,11 @@ class AuthController extends GetxController {
   Future<void> logout() async {
     isLoading.value = true;
     try {
+      // Unregister FCM token before clearing the Bearer token.
+      await Get.find<PushNotificationService>().unregisterTokenFromBackend();
       await authService.logout();
     } catch (_) {
-      // Proceed with local cleanup even if the server call fails.
+      // Proceed with local cleanup even if server calls fail.
     } finally {
       _clearSession();
       isLoading.value = false;

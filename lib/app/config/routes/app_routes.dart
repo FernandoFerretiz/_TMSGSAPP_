@@ -7,6 +7,7 @@ class Routes {
   static const startTrip = _Paths.startTrip;
   static const changeStatus = _Paths.changeStatus;
   static const dashboard = _Paths.dashboard;
+  static const tripDetail = _Paths.tripDetail;
 }
 
 class _Paths {
@@ -16,4 +17,5 @@ class _Paths {
   static const startTrip = RouteNames.startTrip;
   static const changeStatus = RouteNames.changeStatus;
   static const dashboard = RouteNames.dashboard;
+  static const tripDetail = RouteNames.tripDetail;
 }

@@ -8,4 +8,5 @@ abstract class RouteNames {
   // Trip flow
   static const String startTrip = '/trip/start';
   static const String changeStatus = '/trip/change-status';
+  static const String tripDetail = '/trip/detail';
 }
