@@ -1,5 +1,5 @@
-import 'package:daily_task/app/constans/app_constants.dart';
-import 'package:daily_task/app/utils/helpers/app_helpers.dart';
+import 'package:sultanx_tms/app/constans/app_constants.dart';
+import 'package:sultanx_tms/app/utils/helpers/app_helpers.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:timeago/timeago.dart' as timeago;

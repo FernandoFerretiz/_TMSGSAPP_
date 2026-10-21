@@ -18,13 +18,11 @@ class HomeScreen extends StatelessWidget {
     final auth = Get.find<AuthController>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF3F6FC),
       drawer: const AppSidebar(),
       appBar: _buildAppBar(context, home, auth),
       body: Column(
         children: [
-          // Thin accent bar under the app bar
-          Container(height: 3, color: AppColors.electricBlue),
           Expanded(
             child: Obx(() {
               if (home.isAdmin) return const AdminHomeScreen();
@@ -44,66 +42,83 @@ class HomeScreen extends StatelessWidget {
     AuthController auth,
   ) {
     return PreferredSize(
-      preferredSize: const Size.fromHeight(64),
+      preferredSize: const Size.fromHeight(138),
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.navyBlue, AppColors.royalBlue],
+            colors: [Color(0xFF0D47A1), AppColors.royalBlue, AppColors.electricBlue],
+            stops: [0.0, 0.55, 1.0],
           ),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x551565C0),
+              blurRadius: 24,
+              offset: Offset(0, 10),
+            ),
+          ],
         ),
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(6, 2, 6, 14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(Icons.menu_rounded,
-                        color: Colors.white, size: 24),
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  ),
-                ),
-                const Expanded(
-                  child: Text(
-                    AppConfig.appName,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
+                Row(
+                  children: [
+                    Builder(
+                      builder: (ctx) => IconButton(
+                        icon: const Icon(Icons.menu_rounded,
+                            color: Colors.white, size: 26),
+                        onPressed: () => Scaffold.of(ctx).openDrawer(),
+                      ),
                     ),
-                  ),
-                ),
-                Obx(() => _UserChip(
-                      name: home.welcomeName,
-                      avatarUrl: auth.currentUser?.avatarUrl,
-                      token: TokenManager.token,
-                      roleLabel: home.roleLabel,
-                    )),
-                Obx(
-                  () => auth.isLoading.value
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white),
-                            ),
-                          ),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.logout_rounded,
-                              color: Colors.white, size: 20),
-                          tooltip: 'Cerrar sesión',
-                          onPressed: () =>
-                              _confirmLogout(Get.context!, auth),
+                    const Expanded(
+                      child: Text(
+                        AppConfig.appName,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
                         ),
+                      ),
+                    ),
+                    Obx(
+                      () => auth.isLoading.value
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.logout_rounded,
+                                  color: Colors.white, size: 22),
+                              tooltip: 'Cerrar sesión',
+                              onPressed: () =>
+                                  _confirmLogout(Get.context!, auth),
+                            ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                  child: Obx(() => _Greeting(
+                        name: home.welcomeName,
+                        avatarUrl: auth.currentUser?.avatarUrl,
+                        token: TokenManager.token,
+                        roleLabel: home.roleLabel,
+                      )),
                 ),
               ],
             ),
@@ -153,13 +168,13 @@ class HomeScreen extends StatelessWidget {
 
 // ── Sub-widgets ──────────────────────────────────────────────────────────────
 
-class _UserChip extends StatelessWidget {
+class _Greeting extends StatelessWidget {
   final String name;
   final String? avatarUrl;
   final String? token;
   final String roleLabel;
 
-  const _UserChip({
+  const _Greeting({
     required this.name,
     this.avatarUrl,
     this.token,
@@ -170,47 +185,63 @@ class _UserChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final first = name.split(' ').first;
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        // Avatar circle
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: AppColors.electricBlue,
-          backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
-              ? NetworkImage(
-                  avatarUrl!,
-                  headers: token != null
-                      ? {'Authorization': 'Bearer $token'}
-                      : null,
-                )
-              : null,
-          child: (avatarUrl == null || avatarUrl!.isEmpty)
-              ? Text(
-                  first.isNotEmpty ? first[0].toUpperCase() : '?',
+        Container(
+          padding: const EdgeInsets.all(2.5),
+          decoration: const BoxDecoration(
+              color: Colors.white24, shape: BoxShape.circle),
+          child: CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.white,
+            backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                ? NetworkImage(
+                    avatarUrl!,
+                    headers: token != null
+                        ? {'Authorization': 'Bearer $token'}
+                        : null,
+                  )
+                : null,
+            child: (avatarUrl == null || avatarUrl!.isEmpty)
+                ? Text(
+                    first.isNotEmpty ? first[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                        color: AppColors.royalBlue,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800),
+                  )
+                : null,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Hola, $first',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700),
-                )
-              : null,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(height: 2),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(roleLabel,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(width: 8),
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(first,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
-            Text(roleLabel,
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.60),
-                    fontSize: 10.5)),
-          ],
-        ),
-        const SizedBox(width: 4),
       ],
     );
   }
@@ -222,14 +253,20 @@ class _GenericHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        'Bienvenido, $name',
-        style: const TextStyle(
-          color: AppColors.navyBlue,
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
-        ),
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bienvenido, $name',
+            style: const TextStyle(
+              color: AppColors.navyBlue,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

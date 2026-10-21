@@ -1,0 +1,7 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "Operators", "request": "launch", "type": "dart", "args": ["--flavor", "operators"] },
+    { "name": "Staff", "request": "launch", "type": "dart", "args": ["--flavor", "staff"] }
+  ]
+}

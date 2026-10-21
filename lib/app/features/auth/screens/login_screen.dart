@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/config/app_config.dart';
+import '../../../config/routes/route_names.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/gradient_button.dart';
@@ -14,10 +15,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
+  final _identifierCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = false;
 
   late final AuthController _auth;
 
@@ -25,13 +25,17 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _auth = Get.find<AuthController>();
-    // Clear any leftover error from a previous attempt.
-    _auth.errorMessage.value = '';
+    // Deferred to after the current frame: mutating errorMessage
+    // synchronously here can hit an Obx elsewhere still mid-build during a
+    // route transition into this screen, throwing "setState()/
+    // markNeedsBuild() called during build".
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _auth.errorMessage.value = '');
   }
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _identifierCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
   }
@@ -39,9 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     _auth.login(
-      email: _emailCtrl.text.trim(),
+      identifier: _identifierCtrl.text.trim(),
       password: _passwordCtrl.text,
-      rememberMe: _rememberMe,
+      // The session must always persist until the user logs out manually.
+      rememberMe: true,
     );
   }
 
@@ -49,168 +54,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
-      backgroundColor: AppColors.navyBlue,
+      backgroundColor: AppColors.white,
       resizeToAvoidBottomInset: true,
-      body: SizedBox.expand(
-        child: Stack(
-          children: [
-            // Gradient background
-            const DecoratedBox(
-              decoration: BoxDecoration(gradient: AppColors.backgroundGradient),
-              child: SizedBox.expand(),
-            ),
-
-            // Decorative circles — top area
-            Positioned(
-              top: -55,
-              right: -45,
-              child: _Circle(size: 220, alpha: 0.07),
-            ),
-            Positioned(
-              top: 55,
-              left: -65,
-              child: _Circle(size: 175, alpha: 0.055),
-            ),
-            Positioned(
-              top: 150,
-              right: 55,
-              child: _Circle(size: 72, alpha: 0.10),
-            ),
-            Positioned(
-              top: 30,
-              left: 80,
-              child: _Circle(size: 42, alpha: 0.08),
-            ),
-
-            // Content on top
-            SafeArea(
-              child: Column(
-                children: [
-                  // Brand area — fixed height
-                  SizedBox(
-                    height: size.height * 0.29,
-                    child: Center(child: _buildBrand()),
-                  ),
-
-                  // White curved card — fills remaining space
-                  Expanded(child: _buildCard()),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Brand section ──────────────────────────────────────────────────────
-
-  Widget _buildBrand() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 100,
-          height: 100,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white,
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/images/login_bg.jpg',
+            fit: BoxFit.cover,
           ),
-          child: Image.asset(
-            'assets/images/logo1x1.png',
-            fit: BoxFit.contain,
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          AppConfig.appName,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          'Portal para Operadores',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.60),
-            fontSize: 12.5,
-            fontWeight: FontWeight.w400,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ],
-    );
-  }
+          Container(color: AppColors.white.withValues(alpha: 0.93)),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(28, 45, 28, 32),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                _buildLogo(),
+                const SizedBox(height: 38),
+                _buildWelcome(),
+                const SizedBox(height: 35),
 
-  // ── White card with organic curve ──────────────────────────────────────
-
-  Widget _buildCard() {
-    return ClipPath(
-      clipper: _TopCurveClipper(),
-      child: Container(
-        color: Colors.white,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(28, 48, 28, 32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Iniciar Sesión',
-                  style: TextStyle(
-                    color: AppColors.navyBlue,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Accede con tus credenciales',
-                  style: TextStyle(
-                    color: AppColors.textMedium,
-                    fontSize: 13.5,
-                  ),
-                ),
-                const SizedBox(height: 30),
-
-                // Email
+                // Correo o usuario
                 CustomTextField(
-                  controller: _emailCtrl,
-                  labelText: 'Correo electrónico',
-                  hintText: 'operador@empresa.com',
-                  prefixIcon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
+                  controller: _identifierCtrl,
+                  labelText: 'Correo o usuario',
+                  hintText: 'operador@empresa.com o usuario',
+                  prefixIcon: Icons.person_outline,
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'El correo es requerido';
-                    }
-                    if (!GetUtils.isEmail(v.trim())) {
-                      return 'Ingresa un correo válido';
+                      return 'El correo o usuario es requerido';
                     }
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 19),
 
                 // Password
                 CustomTextField(
@@ -242,42 +124,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
 
-                // Remember me
-                GestureDetector(
-                  onTap: () => setState(() => _rememberMe = !_rememberMe),
-                  behavior: HitTestBehavior.opaque,
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          onChanged: (v) =>
-                              setState(() => _rememberMe = v ?? false),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          activeColor: AppColors.royalBlue,
-                          side: const BorderSide(
-                              color: AppColors.textLight, width: 1.5),
-                        ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(
+                        color: AppColors.royalBlue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Recordarme en este dispositivo',
-                        style: TextStyle(
-                          color: AppColors.textMedium,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 27),
 
                 // Error banner
                 Obx(() {
@@ -326,7 +194,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       isLoading: _auth.isLoading.value,
                       label: 'Iniciar sesión',
                     )),
-                const SizedBox(height: 22),
+                const SizedBox(height: 30),
+
+                Center(
+                  child: TextButton(
+                    onPressed: () => Get.toNamed(RouteNames.activateAccount),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      '¿Tienes un código de activación? Activa tu cuenta',
+                      style: TextStyle(
+                        color: AppColors.royalBlue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
 
                 Center(
                   child: Text(
@@ -338,54 +226,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
-}
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Logo section ─────────────────────────────────────────────────────────
 
-class _Circle extends StatelessWidget {
-  final double size;
-  final double alpha;
-
-  const _Circle({required this.size, required this.alpha});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.white.withValues(alpha: alpha),
-          width: 1.5,
-        ),
-        color: Colors.white.withValues(alpha: alpha * 0.28),
-      ),
+  Widget _buildLogo() {
+    return Image.asset(
+      'assets/images/sultanxtms.png',
+      width: double.infinity,
+      fit: BoxFit.contain,
     );
   }
-}
 
-/// Clips the top of the white card into a soft organic wave.
-class _TopCurveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(0, 46);
-    path.quadraticBezierTo(size.width * 0.26, 4, size.width * 0.5, 26);
-    path.quadraticBezierTo(size.width * 0.74, 48, size.width, 16);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    return path;
+  // ── Welcome section ──────────────────────────────────────────────────────
+
+  Widget _buildWelcome() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Bienvenido',
+          style: TextStyle(
+            fontSize: 31,
+            height: 1.1,
+            letterSpacing: -0.8,
+            color: AppColors.textDark,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        SizedBox(height: 9),
+        Text(
+          'Inicia sesión para comenzar\ntu jornada de trabajo.',
+          style: TextStyle(
+            color: AppColors.textMedium,
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
   }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }

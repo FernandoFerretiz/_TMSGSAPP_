@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:daily_task/app/utils/helpers/app_helpers.dart';
+import 'package:sultanx_tms/app/utils/helpers/app_helpers.dart';
 
 class CardTaskData {
   final String label;

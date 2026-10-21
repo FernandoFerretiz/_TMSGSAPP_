@@ -9,10 +9,14 @@ import 'package:get/get.dart';
 import '../config/routes/route_names.dart';
 import '../core/network/api_client.dart';
 import '../core/network/token_manager.dart';
+import '../features/trips/controllers/trip_controller.dart';
 
 // ─── Android notification channel ────────────────────────────────────────────
 
-const _kChannelId = 'trip_notifications';
+// Bumped to _v3 to drop the custom sound and fall back to the system
+// default — channels are immutable once created on a device, so a new id
+// is required for the change to take effect on existing installs.
+const _kChannelId = 'trip_notifications_v3';
 const _kChannelName = 'Viajes';
 const _kChannelDescription = 'Notificaciones de asignación de viajes';
 
@@ -143,7 +147,23 @@ class PushNotificationService extends GetxService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('[FCM] foreground message: ${message.messageId}');
       _showLocalNotification(message);
+      _refreshActiveTripIfNeeded(message.data);
     });
+  }
+
+  // A new assignment or a status change (e.g. the ERP moves the trip to "en
+  // tránsito" directly, without the operator touching the app) are the only
+  // pushes that should refresh the active-trip screen without the user
+  // tapping it — TripController.loadActiveTrip() is what decides whether to
+  // start/stop GPS tracking (server-driven via tracking_enabled), so this is
+  // what closes the gap otherwise left until the next manual pull-to-refresh
+  // or app relaunch.
+  static const _kRefreshOnTypes = {'trip_assigned', 'trip_status_changed'};
+
+  void _refreshActiveTripIfNeeded(Map<String, dynamic> data) {
+    if (!_kRefreshOnTypes.contains(data['type']?.toString())) return;
+    if (!Get.isRegistered<TripController>()) return;
+    Get.find<TripController>().loadActiveTrip();
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
@@ -159,6 +179,7 @@ class PushNotificationService extends GetxService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
+        playSound: true,
       );
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
@@ -167,10 +188,13 @@ class PushNotificationService extends GetxService {
       );
 
       await _localNotifications.show(
-        message.hashCode,
-        title,
-        body,
-        const NotificationDetails(android: androidDetails, iOS: iosDetails),
+        id: message.hashCode,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: androidDetails,
+          iOS: iosDetails,
+        ),
         payload: _buildPayload(message.data),
       );
     } catch (e) {
@@ -218,6 +242,12 @@ class PushNotificationService extends GetxService {
 
       if (type == 'trip_assigned' && tripId != null && tripId.isNotEmpty) {
         Get.toNamed(RouteNames.tripDetail, arguments: tripId);
+      } else if (type == 'trip_stopped' || type == 'trip_resumed') {
+        Get.toNamed(RouteNames.lastEvents);
+      } else if (type == 'trip_status_changed') {
+        // Sin pantalla propia: solo refresca el viaje activo (y por lo
+        // tanto el estado del tracking GPS) al abrir la app desde este push.
+        _refreshActiveTripIfNeeded(data);
       }
     } catch (e) {
       debugPrint('[FCM] handleMessage error: $e');
@@ -235,7 +265,7 @@ class PushNotificationService extends GetxService {
     );
 
     await _localNotifications.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
+      settings: const InitializationSettings(android: androidInit, iOS: iosInit),
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
 
@@ -245,6 +275,7 @@ class PushNotificationService extends GetxService {
       _kChannelName,
       description: _kChannelDescription,
       importance: Importance.high,
+      playSound: true,
     );
     await _localNotifications
         .resolvePlatformSpecificImplementation<

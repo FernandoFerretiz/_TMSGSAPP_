@@ -26,68 +26,84 @@ class HomeActionCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: AppColors.navyBlue.withValues(alpha: 0.07),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF1565C0).withValues(alpha: 0.20),
+                blurRadius: 26,
+                offset: const Offset(0, 10),
               ),
             ],
-            border: highlight
-                ? Border.all(color: AppColors.electricBlue, width: 1.5)
-                : null,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
-                  gradient: highlight
-                      ? AppColors.buttonGradient
-                      : const LinearGradient(
-                          colors: [Color(0xFFE8EEFF), Color(0xFFD6E4FF)],
-                        ),
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: highlight ? AppColors.buttonGradient : null,
+                  color: highlight ? null : _pastel(iconColor),
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(
                   icon,
                   color: highlight
                       ? Colors.white
                       : (iconColor ?? AppColors.royalBlue),
-                  size: 24,
+                  size: 25,
                 ),
               ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.textDark,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textDark,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textMedium,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 3),
-                Text(
-                  subtitle!,
-                  style: const TextStyle(
-                    color: AppColors.textLight,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              if (onTap != null)
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textLight),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Fondo pastel del círculo del ícono, derivado del color del ícono.
+  static Color _pastel(Color? c) {
+    final base = c ?? AppColors.royalBlue;
+    return Color.alphaBlend(base.withValues(alpha: 0.13), Colors.white);
   }
 }

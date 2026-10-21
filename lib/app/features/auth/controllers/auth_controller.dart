@@ -5,7 +5,9 @@ import '../../../config/routes/route_names.dart';
 import '../../../core/network/token_manager.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../services/push_notification_service.dart';
+import '../../location/services/tracking_service.dart';
 import '../data/auth_service.dart';
+import '../models/activate_account_request.dart';
 import '../models/auth_response.dart';
 import '../models/login_request.dart';
 import '../models/user_model.dart';
@@ -21,6 +23,9 @@ class AuthController extends GetxController {
 
   final isLoading = false.obs;
   final isCheckingAuth = true.obs;
+  // true cuando no se pudo validar la sesión guardada por un error que no
+  // es de credenciales (sin red, timeout, 5xx): el token se conserva.
+  final authCheckFailed = false.obs;
   final errorMessage = ''.obs;
 
   final _currentUser = Rxn<UserModel>();
@@ -55,6 +60,7 @@ class AuthController extends GetxController {
 
   Future<void> checkAuthStatus() async {
     isCheckingAuth.value = true;
+    authCheckFailed.value = false;
     try {
       final savedToken = await storageService.getToken();
 
@@ -64,28 +70,57 @@ class AuthController extends GetxController {
       }
 
       TokenManager.setToken(savedToken);
-      final user = await authService.me();
-      _currentUser.value = user;
-      // Roles are not returned by /me — they were set at login.
-      // If roles are empty here (cold-start after token restore), we rely
-      // on a future /me that returns roles, or redirect to login to re-auth.
+      final response = await _meWithRetry();
+      _currentUser.value = response.user;
+      _roles.value = response.roles;
+      _permissions.value = response.permissions;
+      if (kDebugMode) debugPrint('[TRACKING] Usuario autenticado (sesión restaurada)');
+
+      // La sesión restaurada no pasa por login()/activate(), así que el
+      // token FCM nunca se (re)envía al backend en este camino. Sin esto,
+      // un usuario que reabre la app con sesión guardada se queda sin
+      // notificaciones push hasta que vuelva a hacer login manualmente.
+      Get.find<PushNotificationService>()
+          .registerTokenWithBackend()
+          .ignore();
+
       Get.offAllNamed(RouteNames.home);
-    } on DioException {
-      TokenManager.clear();
-      await storageService.deleteToken();
-      Get.offAllNamed(RouteNames.login);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        // Único caso en que la sesión realmente ya no es válida.
+        TokenManager.clear();
+        await storageService.deleteToken();
+        Get.offAllNamed(RouteNames.login);
+      } else {
+        // Sin red / timeout / error del servidor: no se pierde la sesión,
+        // se deja reintentar desde la pantalla de inicio.
+        authCheckFailed.value = true;
+      }
     } catch (_) {
-      TokenManager.clear();
-      Get.offAllNamed(RouteNames.login);
+      authCheckFailed.value = true;
     } finally {
       isCheckingAuth.value = false;
+    }
+  }
+
+  // Reintenta /me ante fallos transitorios (red, timeout, 5xx); un 401 se
+  // propaga de inmediato.
+  Future<AuthResponse> _meWithRetry() async {
+    const maxAttempts = 3;
+    for (var attempt = 1;; attempt++) {
+      try {
+        return await authService.me();
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 401 || attempt >= maxAttempts) rethrow;
+        await Future.delayed(Duration(seconds: attempt * 2));
+      }
     }
   }
 
   // ── Login ─────────────────────────────────────────────────────────────
 
   Future<void> login({
-    required String email,
+    required String identifier,
     required String password,
     required bool rememberMe,
   }) async {
@@ -94,10 +129,15 @@ class AuthController extends GetxController {
 
     try {
       final response = await authService.login(
-        LoginRequest(email: email, password: password, rememberMe: rememberMe),
+        LoginRequest(
+          identifier: identifier,
+          password: password,
+          rememberMe: rememberMe,
+        ),
       );
 
       _applyAuthResponse(response);
+      if (kDebugMode) debugPrint('[TRACKING] Usuario autenticado');
 
       if (rememberMe) {
         await storageService.saveToken(response.token);
@@ -125,11 +165,62 @@ class AuthController extends GetxController {
     }
   }
 
+  // ── Activación de cuenta invitada (operador/contacto sin correo) ───────
+
+  Future<void> activate({
+    required String identifier,
+    required String pin,
+    required String password,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+
+    try {
+      final response = await authService.activate(
+        ActivateAccountRequest(
+          identifier: identifier,
+          pin: pin,
+          password: password,
+        ),
+      );
+
+      _applyAuthResponse(response);
+      if (kDebugMode) debugPrint('[TRACKING] Cuenta activada e inicio de sesión');
+
+      // La activación siempre deja la sesión iniciada de forma persistente,
+      // igual que "recordarme" en el login normal.
+      await storageService.saveToken(response.token);
+
+      Get.find<PushNotificationService>()
+          .registerTokenWithBackend()
+          .ignore();
+
+      Get.offAllNamed(RouteNames.home);
+    } on DioException catch (e, st) {
+      _printDioError(e, st);
+      errorMessage.value = _getDioErrorMessage(e);
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('Unexpected activate error: $e\n$st');
+      }
+      errorMessage.value = 'Error inesperado. Inténtalo de nuevo.';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // ── Logout ────────────────────────────────────────────────────────────
 
   Future<void> logout() async {
     isLoading.value = true;
     try {
+      if (kDebugMode) debugPrint('[TRACKING] Usuario cerró sesión');
+      // Stop tracking before the route change disposes TrackingService, so
+      // the foreground service doesn't keep running orphaned after logout.
+      if (Get.isRegistered<TrackingService>()) {
+        if (kDebugMode) debugPrint('[TRACKING] Tracking detenido por logout');
+        await Get.find<TrackingService>().stopTracking();
+      }
       // Unregister FCM token before clearing the Bearer token.
       await Get.find<PushNotificationService>().unregisterTokenFromBackend();
       await authService.logout();

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../../core/config/app_config.dart';
+import '../../../config/routes/route_names.dart';
 import '../widgets/home_action_card.dart';
 
 class AdminHomeScreen extends StatelessWidget {
@@ -34,37 +36,31 @@ class AdminHomeScreen extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 14,
             crossAxisSpacing: 14,
-            childAspectRatio: 1.1,
+            childAspectRatio: 0.95,
             children: [
               HomeActionCard(
                 icon: Icons.route_rounded,
-                title: 'Viajes',
-                subtitle: 'Gestionar rutas',
-                onTap: () {/* TODO: navigate to trips */},
+                title: 'Nuevo viaje de circuito',
+                subtitle: 'Dar de alta una vuelta con formulario',
+                onTap: () => Get.toNamed(RouteNames.circuitTripForm),
               ),
               HomeActionCard(
-                icon: Icons.people_rounded,
-                title: 'Clientes',
-                subtitle: 'Administrar clientes',
-                onTap: () {/* TODO */},
+                icon: Icons.history_rounded,
+                title: 'Historial de viajes',
+                subtitle: 'Historial de cambios de estado y problemas por viaje',
+                onTap: () => Get.toNamed(RouteNames.tripHistoryList),
               ),
               HomeActionCard(
-                icon: Icons.local_shipping_rounded,
-                title: 'Transportistas',
-                subtitle: 'Administrar flota',
-                onTap: () {/* TODO */},
+                icon: Icons.swap_horiz_rounded,
+                title: 'Cobertura de turno',
+                subtitle: 'Cubrir a otro usuario del organigrama',
+                onTap: () => Get.toNamed(RouteNames.shiftCoverageList),
               ),
               HomeActionCard(
-                icon: Icons.badge_rounded,
-                title: 'Operadores',
-                subtitle: 'Gestionar operadores',
-                onTap: () {/* TODO */},
-              ),
-              HomeActionCard(
-                icon: Icons.directions_car_rounded,
-                title: 'Unidades',
-                subtitle: 'Inventario vehicular',
-                onTap: () {/* TODO */},
+                icon: Icons.event_note_rounded,
+                title: 'Últimos eventos',
+                subtitle: 'Cambios de estado, incidencias y detenciones',
+                onTap: () => Get.toNamed(RouteNames.lastEvents),
               ),
             ],
           ),

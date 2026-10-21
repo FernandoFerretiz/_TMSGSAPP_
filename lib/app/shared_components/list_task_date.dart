@@ -1,4 +1,4 @@
-import 'package:daily_task/app/constans/app_constants.dart';
+import 'package:sultanx_tms/app/constans/app_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

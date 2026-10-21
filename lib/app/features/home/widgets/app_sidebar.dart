@@ -12,55 +12,46 @@ class AppSidebar extends StatelessWidget {
     final auth = Get.find<AuthController>();
 
     return Drawer(
-      width: 285,
-      backgroundColor: Colors.transparent,
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.navyBlue, AppColors.darkNavy],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(auth),
-              const _SidebarDivider(),
-              Expanded(
-                child: ListView(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  children: [
-                    // Home — all roles
-                    _SidebarItem(
-                      icon: Icons.home_rounded,
-                      label: 'Inicio',
-                      onTap: () => _close(),
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Role-specific section header
-                    _buildRoleSection(auth),
-                  ],
+      width: 295,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(30)),
+      ),
+      child: Column(
+        children: [
+          _buildHeader(auth),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+              children: [
+                // Home — all roles
+                _SidebarItem(
+                  icon: Icons.home_rounded,
+                  label: 'Inicio',
+                  onTap: () => _close(),
                 ),
-              ),
-              const _SidebarDivider(),
-              // Logout
-              _SidebarItem(
-                icon: Icons.logout_rounded,
-                label: 'Cerrar sesión',
-                iconColor: const Color(0xFFEF9A9A),
-                textColor: const Color(0xFFEF9A9A),
-                onTap: () {
-                  _close();
-                  auth.logout();
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 4),
+
+                // Role-specific section header
+                _buildRoleSection(auth),
+              ],
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+            child: _SidebarItem(
+              icon: Icons.logout_rounded,
+              label: 'Cerrar sesión',
+              iconColor: AppColors.errorRed,
+              textColor: AppColors.errorRed,
+              onTap: () {
+                _close();
+                auth.logout();
+              },
+            ),
+          ),
+          SizedBox(height: MediaQuery.of(Get.context!).padding.bottom + 14),
+        ],
       ),
     );
   }
@@ -73,26 +64,43 @@ class AppSidebar extends StatelessWidget {
       final initials = _initials(user?.name ?? '?');
 
       return Container(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+            20, MediaQuery.of(Get.context!).padding.top + 22, 20, 24),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0D47A1),
+              AppColors.royalBlue,
+              AppColors.electricBlue
+            ],
+            stops: [0.0, 0.55, 1.0],
+          ),
+          borderRadius: BorderRadius.only(
+            topRight: Radius.circular(30),
+            bottomRight: Radius.circular(30),
+          ),
+        ),
         child: Row(
           children: [
-            // Avatar
             Container(
-              width: 52,
-              height: 52,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                gradient: AppColors.buttonGradient,
+                color: Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2), width: 1.5),
+                    color: Colors.white.withValues(alpha: 0.35), width: 3),
               ),
               child: Center(
                 child: Text(
                   initials,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    color: AppColors.royalBlue,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
@@ -106,12 +114,12 @@ class AppSidebar extends StatelessWidget {
                     user?.name ?? '—',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   _RoleBadge(auth.primaryRoleLabel),
                 ],
               ),
@@ -125,77 +133,9 @@ class AppSidebar extends StatelessWidget {
   // ── Role-specific items ────────────────────────────────────────────────
 
   Widget _buildRoleSection(AuthController auth) {
-    if (auth.hasRole('admin')) return _adminItems();
-    if (auth.hasRole('monitorista')) return _monitorItems();
     if (auth.hasRole('operador')) return _operatorItems();
+    // Admin/monitorista: sin secciones propias todavía (pendientes de implementar).
     return const SizedBox.shrink();
-  }
-
-  Widget _adminItems() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('Gestión'),
-        // if (auth.hasPermission('trip.index'))
-        _SidebarItem(
-          icon: Icons.route_rounded,
-          label: 'Viajes',
-          onTap: () => _close(),
-        ),
-        _SidebarItem(
-          icon: Icons.people_rounded,
-          label: 'Clientes',
-          onTap: () => _close(),
-        ),
-        _SidebarItem(
-          icon: Icons.local_shipping_rounded,
-          label: 'Transportistas',
-          onTap: () => _close(),
-        ),
-        _SidebarItem(
-          icon: Icons.badge_rounded,
-          label: 'Operadores',
-          onTap: () => _close(),
-        ),
-        _SidebarItem(
-          icon: Icons.directions_car_rounded,
-          label: 'Unidades',
-          onTap: () => _close(),
-        ),
-      ],
-    );
-  }
-
-  Widget _monitorItems() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('Operaciones'),
-        // if (auth.hasPermission('trip.create'))
-        _SidebarItem(
-          icon: Icons.add_circle_rounded,
-          label: 'Nueva asignación',
-          onTap: () => _close(),
-        ),
-        // if (auth.hasPermission('trip.update'))
-        _SidebarItem(
-          icon: Icons.swap_horiz_rounded,
-          label: 'Cambiar status',
-          onTap: () => _close(),
-        ),
-        _SidebarItem(
-          icon: Icons.upload_file_rounded,
-          label: 'Cargar documentos',
-          onTap: () => _close(),
-        ),
-        // if (auth.hasPermission('trip.index'))
-        _SidebarItem(
-          icon: Icons.list_alt_rounded,
-          label: 'Consultar viajes',
-          onTap: () => _close(),
-        ),
-      ],
-    );
   }
 
   Widget _operatorItems() {
@@ -224,8 +164,8 @@ class AppSidebar extends StatelessWidget {
             _SidebarItem(
               icon: Icons.play_circle_rounded,
               label: 'Iniciar viaje',
-              iconColor: const Color(0xFF81C784),
-              textColor: const Color(0xFF81C784),
+              iconColor: const Color(0xFF2E9E5B),
+              textColor: const Color(0xFF2E9E5B),
               onTap: () {
                 _close();
                 tc?.goToStartTrip();
@@ -235,7 +175,7 @@ class AppSidebar extends StatelessWidget {
             // if (auth.hasPermission('trip.update'))
             _SidebarItem(
               icon: Icons.warning_amber_rounded,
-              label: 'Reportar incidencia',
+              label: 'Reportar un problema',
               onTap: () => _close(),
             ),
             _SidebarItem(
@@ -278,30 +218,43 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ic = iconColor ?? AppColors.skyBlue;
-    final tc = textColor ?? Colors.white;
+    final ic = iconColor ?? AppColors.royalBlue;
+    final tc = textColor ?? AppColors.textDark;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        splashColor: AppColors.electricBlue.withValues(alpha: 0.12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          child: Row(
-            children: [
-              Icon(icon, color: ic, size: 20),
-              const SizedBox(width: 14),
-              Text(
-                label,
-                style: TextStyle(
-                  color: tc,
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w500,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Color.alphaBlend(
+                        ic.withValues(alpha: 0.13), Colors.white),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: ic, size: 20),
                 ),
-              ),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: tc,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -320,7 +273,7 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: AppColors.skyBlue.withValues(alpha: 0.55),
+          color: AppColors.textLight,
           fontSize: 10.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
@@ -337,19 +290,17 @@ class _RoleBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.electricBlue.withValues(alpha: 0.18),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: AppColors.electricBlue.withValues(alpha: 0.35)),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: AppColors.skyBlue,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+          color: Colors.white,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

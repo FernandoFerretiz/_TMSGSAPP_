@@ -1,20 +1,20 @@
 library dashboard;
 
-import 'package:daily_task/app/constans/app_constants.dart';
-import 'package:daily_task/app/shared_components/card_task.dart';
-import 'package:daily_task/app/shared_components/header_text.dart';
-import 'package:daily_task/app/shared_components/list_task_assigned.dart';
-import 'package:daily_task/app/shared_components/list_task_date.dart';
-import 'package:daily_task/app/shared_components/responsive_builder.dart';
-import 'package:daily_task/app/shared_components/search_field.dart';
-import 'package:daily_task/app/shared_components/selection_button.dart';
-import 'package:daily_task/app/shared_components/simple_selection_button.dart';
-import 'package:daily_task/app/shared_components/simple_user_profile.dart';
-import 'package:daily_task/app/shared_components/task_progress.dart';
-import 'package:daily_task/app/shared_components/user_profile.dart';
+import 'package:sultanx_tms/app/constans/app_constants.dart';
+import 'package:sultanx_tms/app/shared_components/card_task.dart';
+import 'package:sultanx_tms/app/shared_components/header_text.dart';
+import 'package:sultanx_tms/app/shared_components/list_task_assigned.dart';
+import 'package:sultanx_tms/app/shared_components/list_task_date.dart';
+import 'package:sultanx_tms/app/shared_components/responsive_builder.dart';
+import 'package:sultanx_tms/app/shared_components/search_field.dart';
+import 'package:sultanx_tms/app/shared_components/selection_button.dart';
+import 'package:sultanx_tms/app/shared_components/simple_selection_button.dart';
+import 'package:sultanx_tms/app/shared_components/simple_user_profile.dart';
+import 'package:sultanx_tms/app/shared_components/task_progress.dart';
+import 'package:sultanx_tms/app/shared_components/user_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:daily_task/app/utils/helpers/app_helpers.dart';
+import 'package:sultanx_tms/app/utils/helpers/app_helpers.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 

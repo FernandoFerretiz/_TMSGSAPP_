@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backs the FileProvider used by ShareService to hand evidence files to
+     WhatsApp/Telegram. Covers both the app's cache dir (where
+     RemoteFileDownloader saves downloaded evidence) and its documents dir. -->
+<paths>
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+</paths>

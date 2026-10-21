@@ -1,8 +1,10 @@
+import '../../../core/design/sx_design.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/config/app_config.dart';
 import '../controllers/trip_controller.dart';
+import '../models/trip_model.dart';
 import '../../../config/routes/route_names.dart';
 
 /// Pantalla abierta al tocar una notificación push de tipo `trip_assigned`.
@@ -36,18 +38,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.fieldFill,
-      appBar: AppBar(
-        backgroundColor: AppColors.navyBlue,
-        foregroundColor: Colors.white,
-        title: const Text(
+      appBar: SxAppBar(title: const Text(
           'Detalle del viaje',
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 17,
           ),
-        ),
-        elevation: 0,
-      ),
+        )),
       body: Obx(() {
         if (_tc.isLoading.value) {
           return const Center(
@@ -131,7 +128,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
 // ── Trip info card ────────────────────────────────────────────────────────────
 
 class _TripInfoCard extends StatelessWidget {
-  final dynamic trip;
+  final TripModel trip;
   final String? tripId;
   const _TripInfoCard({required this.trip, required this.tripId});
 
@@ -156,31 +153,31 @@ class _TripInfoCard extends StatelessWidget {
           _Row(
             icon: Icons.local_shipping_rounded,
             label: 'Unidad',
-            value: trip.truckboxNum?.toString() ?? '—',
+            value: trip.truckboxNum.isNotEmpty ? trip.truckboxNum : '—',
           ),
           const Divider(height: 20),
           _Row(
             icon: Icons.trip_origin_rounded,
             label: 'Origen',
-            value: trip.originName ?? trip.origin?.toString() ?? '—',
+            value: trip.origin.isNotEmpty ? trip.origin : '—',
           ),
           const Divider(height: 20),
           _Row(
             icon: Icons.flag_rounded,
             label: 'Destino',
-            value: trip.destinationName ?? trip.destination?.toString() ?? '—',
+            value: trip.destination.isNotEmpty ? trip.destination : '—',
           ),
           const Divider(height: 20),
           _Row(
             icon: Icons.tag_rounded,
             label: 'ID de viaje',
-            value: tripId ?? trip.id?.toString() ?? '—',
+            value: tripId ?? trip.id.toString(),
           ),
           const Divider(height: 20),
           _Row(
             icon: Icons.info_outline_rounded,
             label: 'Estado',
-            value: trip.statusLabel ?? trip.status?.toString() ?? '—',
+            value: trip.statusLabel.isNotEmpty ? trip.statusLabel : trip.status,
           ),
         ],
       ),

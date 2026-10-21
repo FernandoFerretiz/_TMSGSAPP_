@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "106425514261",
+    "project_id": "tms-gs",
+    "storage_bucket": "tms-gs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106425514261:android:d80c4aed917d72bc74d11c",
+        "android_client_info": {
+          "package_name": "com.example.daily_task"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYVtNN_DEdaudGXcieIBxZmYH5KMqdOZg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106425514261:android:c2708224e53cd92074d11c",
+        "android_client_info": {
+          "package_name": "com.sultanx.tms"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYVtNN_DEdaudGXcieIBxZmYH5KMqdOZg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
 class AppConfig {
-  static const String appName = 'TMS Operadores';
+  static const String appName = 'SultanX TMS';
 
   // Update this URL to match your Laravel API base URL.
   // Android emulator → http://10.0.2.2:8000
  // iOS simulator    → http://localhost:8000
+  // Physical device  → http://<tu-IP-local>:puerto (misma WiFi que el servidor)
   // Production       → https://your-tms-domain.com
-  static const String baseUrl = 'http://10.0.2.2:82/';
+  
+  static const String baseUrl = 'https://tms.sultanx.com.mx/';
+  //static const String baseUrl = 'https://staging-tms.sultanx.com.mx/'; // Staging: descomenta para generar APK contra staging
+  //static const String baseUrl = 'http://10.0.2.2:82/'; // Local (emulador Android) contra gs_erp
 
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);

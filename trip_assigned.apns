@@ -1,0 +1,17 @@
+{
+  "Simulator Target Bundle": "com.example.dailyTask",
+  "aps": {
+    "alert": {
+      "title": "Nuevo viaje asignado",
+      "body": "Se te asignó un nuevo viaje. Caja: 1234"
+    },
+    "sound": "default"
+  },
+  "type": "trip_assigned",
+  "trip_id": "1",
+  "operator_id": "1",
+  "truckbox_num": "1234",
+  "origin_id": "1",
+  "destination_id": "2",
+  "operational_status": "pending"
+}

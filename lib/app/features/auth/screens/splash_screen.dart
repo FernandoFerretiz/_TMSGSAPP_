@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/config/app_config.dart';
@@ -24,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2000),
     );
     _fade = CurvedAnimation(parent: _anim, curve: Curves.easeIn);
     _scale = Tween<double>(begin: 0.82, end: 1.0).animate(
@@ -47,9 +49,16 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
-        child: Center(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background image
+          Image.asset(
+            'assets/images/splash_white2.png',
+            fit: BoxFit.cover,
+          ),
+        
+          Center(
           child: FadeTransition(
             opacity: _fade,
             child: ScaleTransition(
@@ -58,59 +67,65 @@ class _SplashScreenState extends State<SplashScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // App icon
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      color: Colors.white,
-                      size: 52,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  
                   const Text(
+                    
                     AppConfig.appName,
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.textDark,
                       fontSize: 28,
+                      
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.1,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
+                  const Text(
                     'Sistema de Gestión de Transporte',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.65),
+                      color: AppColors.textMedium,
                       fontSize: 13,
                       fontWeight: FontWeight.w400,
                       letterSpacing: 0.4,
                     ),
                   ),
                   const SizedBox(height: 64),
-                  SizedBox(
+                  Obx(() {
+                    final auth = Get.find<AuthController>();
+                    if (!auth.authCheckFailed.value) return const SizedBox.shrink();
+                    return Column(
+                      children: [
+                        const Text(
+                          'No se pudo conectar con el servidor.\nTu sesión sigue guardada.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textMedium, fontSize: 13),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: auth.checkAuthStatus,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    );
+                  }),
+                  Obx(() => Get.find<AuthController>().authCheckFailed.value
+                      ? const SizedBox.shrink()
+                      : const SizedBox(
                     width: 26,
                     height: 26,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withValues(alpha: 0.65),
+                        AppColors.royalBlue,
                       ),
                     ),
-                  ),
+                  )),
                 ],
               ),
             ),
           ),
-        ),
+          ),
+        ],
       ),
     );
   }

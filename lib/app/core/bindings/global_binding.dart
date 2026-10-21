@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
 import '../network/api_client.dart';
 import '../storage/secure_storage_service.dart';
+import '../share/receive_share_controller.dart';
+import '../share/receive_share_service.dart';
 import '../../features/auth/data/auth_service.dart';
 import '../../features/auth/controllers/auth_controller.dart';
 import '../../services/push_notification_service.dart';
@@ -21,6 +23,11 @@ class GlobalBinding extends Bindings {
     );
     Get.putAsync<PushNotificationService>(
       () => PushNotificationService(Get.find<ApiClient>()).init(),
+      permanent: true,
+    );
+    Get.put(ReceiveShareService(), permanent: true);
+    Get.put(
+      ReceiveShareController(Get.find<ReceiveShareService>()),
       permanent: true,
     );
   }

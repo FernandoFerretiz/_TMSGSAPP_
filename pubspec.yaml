@@ -1,5 +1,5 @@
-name: daily_task
-description: A new Flutter project.
+name: sultanx_tms
+description: SultanX TMS App
 
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -40,16 +40,43 @@ dependencies:
   intl: ^0.20.2
   percent_indicator: ^4.2.5
   dotted_border: ^3.1.0
+  dropdown_button2: ^2.3.9
   timeago: ^3.1.0
   flutter_local_notifications: ^21.0.0
   firebase_core: ^3.13.1
   firebase_messaging: ^15.2.5
   device_info_plus: ^11.3.3
+  sqflite: ^2.4.2
+  uuid: ^4.5.3
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.1
+  file_picker: ^8.3.7
 
 dev_dependencies:
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
   flutter_test:
     sdk: flutter
+  flutter_native_splash: ^2.4.8
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon.png"
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/sultanxtms.png
+  android_12:
+    color: "#FFFFFF"
+    image: assets/images/sultanxtms.png
+  android: true
+  ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -29,4 +29,9 @@ class ActiveTripResponse {
   bool get canReportIncident => availableActions.contains('report_incident');
   bool get canSendEvidence => availableActions.contains('send_evidence');
   bool get canFinishTrip => availableActions.contains('finish_trip');
+  bool get canReportToClient => availableActions.contains('report_to_client');
+  bool get canMarkRampAssigned =>
+      availableActions.contains('mark_ramp_assigned');
+  bool get canMarkLoadingUnloading =>
+      availableActions.contains('mark_loading_unloading');
 }
