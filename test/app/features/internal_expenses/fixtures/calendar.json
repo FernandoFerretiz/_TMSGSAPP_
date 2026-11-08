@@ -1,0 +1,1 @@
+{"ok":true,"data":[{"period_id":935,"expense_id":733,"name":"Internet","due_on":"2026-03-04","amount":1299,"currency_code":"USD","state_key":"paid","state_label":"Pagado","alert":null},{"period_id":937,"expense_id":734,"name":"Seguro","due_on":"2026-03-15","amount":900,"currency_code":"MXN","state_key":"pending","state_label":"Pendiente","alert":null}]}

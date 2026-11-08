@@ -7,9 +7,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 
 import '../config/routes/route_names.dart';
+import '../config/app_flavor.dart';
 import '../core/network/api_client.dart';
 import '../core/network/token_manager.dart';
 import '../features/trips/controllers/trip_controller.dart';
+import 'remote_command_service.dart';
 
 // ─── Android notification channel ────────────────────────────────────────────
 
@@ -19,6 +21,12 @@ import '../features/trips/controllers/trip_controller.dart';
 const _kChannelId = 'trip_notifications_v3';
 const _kChannelName = 'Viajes';
 const _kChannelDescription = 'Notificaciones de asignación de viajes';
+
+// Avisos de vencimientos de gastos internos (flavor staff). El backend los manda con este mismo id
+// (InternalExpenseDuePushNotification) y `data.type = internal_expense_due`.
+const _kExpenseChannelId = 'expense_reminders_v1';
+const _kExpenseChannelName = 'Gastos internos';
+const _kExpenseChannelDescription = 'Recordatorios de vencimientos de gastos internos';
 
 final _localNotifications = FlutterLocalNotificationsPlugin();
 
@@ -30,6 +38,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // does it automatically), but we guard with a try/catch just in case.
   try {
     debugPrint('[FCM-BG] message received: ${message.messageId}');
+    // Órdenes silenciosas del TMS (diagnóstico / refrescar pantalla): no
+    // llevan notificación visible, las atiende la app directamente.
+    if (RemoteCommandService.handles(message.data)) {
+      await RemoteCommandService.handle(message.data, inBackground: true);
+    }
   } catch (e) {
     debugPrint('[FCM-BG] error: $e');
   }
@@ -49,6 +62,7 @@ class PushNotificationService extends GetxService {
     _listenTokenRefresh();
     _setupForegroundListener();
     _setupNotificationTapHandlers();
+    RemoteCommandLifecycleObserver().attach();
     return this;
   }
 
@@ -146,6 +160,10 @@ class PushNotificationService extends GetxService {
   void _setupForegroundListener() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('[FCM] foreground message: ${message.messageId}');
+      if (RemoteCommandService.handles(message.data)) {
+        RemoteCommandService.handle(message.data, inBackground: false);
+        return;
+      }
       _showLocalNotification(message);
       _refreshActiveTripIfNeeded(message.data);
     });
@@ -172,10 +190,12 @@ class PushNotificationService extends GetxService {
       final body =
           message.notification?.body ?? 'Se te asignó un nuevo viaje.';
 
-      const androidDetails = AndroidNotificationDetails(
-        _kChannelId,
-        _kChannelName,
-        channelDescription: _kChannelDescription,
+      final isExpense = message.data['type']?.toString() == 'internal_expense_due';
+
+      final androidDetails = AndroidNotificationDetails(
+        isExpense ? _kExpenseChannelId : _kChannelId,
+        isExpense ? _kExpenseChannelName : _kChannelName,
+        channelDescription: isExpense ? _kExpenseChannelDescription : _kChannelDescription,
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
@@ -191,7 +211,7 @@ class PushNotificationService extends GetxService {
         id: message.hashCode,
         title: title,
         body: body,
-        notificationDetails: const NotificationDetails(
+        notificationDetails: NotificationDetails(
           android: androidDetails,
           iOS: iosDetails,
         ),
@@ -242,6 +262,15 @@ class PushNotificationService extends GetxService {
 
       if (type == 'trip_assigned' && tripId != null && tripId.isNotEmpty) {
         Get.toNamed(RouteNames.tripDetail, arguments: tripId);
+      } else if (type == 'internal_expense_due') {
+        // Solo el flavor staff tiene la sección; el servidor exige el permiso al abrir el detalle.
+        final expenseId = int.tryParse(data['internal_expense_id']?.toString() ?? '');
+        if (AppFlavor.current.isStaff && expenseId != null) {
+          Get.toNamed(RouteNames.internalExpenseDetail, arguments: expenseId);
+        }
+      } else if (type == 'operational_alert' || type == 'operator_battery_low_staff') {
+        // Alerta escalada a este usuario: se atiende desde la pantalla de alertas (solo staff).
+        if (AppFlavor.current.isStaff) Get.toNamed(RouteNames.alerts);
       } else if (type == 'trip_stopped' || type == 'trip_resumed') {
         Get.toNamed(RouteNames.lastEvents);
       } else if (type == 'trip_status_changed') {
@@ -277,10 +306,17 @@ class PushNotificationService extends GetxService {
       importance: Importance.high,
       playSound: true,
     );
-    await _localNotifications
+    final android = _localNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+            AndroidFlutterLocalNotificationsPlugin>();
+    await android?.createNotificationChannel(channel);
+    await android?.createNotificationChannel(const AndroidNotificationChannel(
+      _kExpenseChannelId,
+      _kExpenseChannelName,
+      description: _kExpenseChannelDescription,
+      importance: Importance.high,
+      playSound: true,
+    ));
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

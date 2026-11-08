@@ -114,23 +114,25 @@ class ActiveTripCard extends StatelessWidget {
                         ],
                       ),
                     ],
+                    if (_hasOriginLink(trip)) ...[
+                      const SizedBox(height: 10),
+                      _MapsLink(
+                        label: 'Abrir origen en Maps',
+                        onTap: () => _openInMaps(
+                          trip.originMapsUrl,
+                          trip.originLatitude,
+                          trip.originLongitude,
+                        ),
+                      ),
+                    ],
                     if (_hasMapsLink(trip)) ...[
                       const SizedBox(height: 10),
-                      InkWell(
-                        onTap: () => _openInMaps(trip),
-                        borderRadius: BorderRadius.circular(8),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.map_rounded,
-                                color: AppColors.royalBlue, size: 15),
-                            SizedBox(width: 6),
-                            Text('Abrir destino en Maps',
-                                style: TextStyle(
-                                    color: AppColors.royalBlue,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
-                                    decoration: TextDecoration.underline)),
-                          ],
+                      _MapsLink(
+                        label: 'Abrir destino en Maps',
+                        onTap: () => _openInMaps(
+                          trip.destinationMapsUrl,
+                          trip.destinationLatitude,
+                          trip.destinationLongitude,
                         ),
                       ),
                     ],
@@ -158,12 +160,43 @@ class ActiveTripCard extends StatelessWidget {
       trip.destinationMapsUrl != null ||
       (trip.destinationLatitude != null && trip.destinationLongitude != null);
 
-  Future<void> _openInMaps(TripModel trip) async {
-    final uri = trip.destinationMapsUrl != null
-        ? Uri.parse(trip.destinationMapsUrl!)
+  bool _hasOriginLink(TripModel trip) =>
+      (trip.originMapsUrl != null && trip.originMapsUrl!.isNotEmpty) ||
+      (trip.originLatitude != null && trip.originLongitude != null);
+
+  Future<void> _openInMaps(String? url, double? lat, double? lng) async {
+    final uri = (url != null && url.isNotEmpty)
+        ? Uri.parse(url)
         : Uri.parse(
-            'https://www.google.com/maps/search/?api=1&query=${trip.destinationLatitude},${trip.destinationLongitude}');
+            'https://www.google.com/maps/search/?api=1&query=$lat,$lng');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+/// Enlace "Abrir … en Maps" de la tarjeta del viaje activo.
+class _MapsLink extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _MapsLink({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: [
+          const Icon(Icons.map_rounded, color: AppColors.royalBlue, size: 15),
+          const SizedBox(width: 6),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.royalBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  decoration: TextDecoration.underline)),
+        ],
+      ),
+    );
   }
 }
 

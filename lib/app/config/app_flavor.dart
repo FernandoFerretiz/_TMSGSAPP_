@@ -11,5 +11,5 @@ enum AppFlavor {
   bool get isStaff => this == AppFlavor.staff;
   bool get isOperators => this == AppFlavor.operators;
 
-  String get title => isStaff ? 'TMS Staff' : 'TMS Operadores';
+  String get title => isStaff ? 'SultánX Staff' : 'SultánX Operadores';
 }

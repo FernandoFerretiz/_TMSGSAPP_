@@ -9,6 +9,7 @@ import '../controllers/trip_history_controller.dart';
 import '../models/trip_summary.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/trip_history_filters_sheet.dart';
+import '../../../utils/helpers/server_time.dart';
 
 const _kSurfaceBg = Color(0xFFF3F6FC);
 
@@ -49,8 +50,7 @@ class _TripHistoryListScreenState extends State<TripHistoryListScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
       _controller.loadMoreTrips();
     }
   }
@@ -67,48 +67,64 @@ class _TripHistoryListScreenState extends State<TripHistoryListScreen> {
     }
   }
 
+  bool _sameDay(DateTime? a, DateTime? b) =>
+      a != null && b != null && a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// Abre el formulario de circuito con la ronda ya elegida (cliente, circuito y
+  /// operador) para registrar el siguiente movimiento.
+  Future<void> _addMovement(TripRoundGroup round) async {
+    final added = await Get.toNamed(RouteNames.circuitTripForm, arguments: {
+      'client_id': round.clientId,
+      'client_circuit_id': round.clientCircuitId,
+      'operator_id': round.operatorId,
+    });
+    if (added == true) _controller.loadTrips();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kSurfaceBg,
-      appBar: SxAppBar(title: const Text(
-          'Historial de viajes',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ), actions: [
-          Obx(() {
-            final count = _controller.filters.value.activeCount;
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  onPressed: _openFilters,
-                  icon: const Icon(Icons.filter_list_rounded),
-                ),
-                if (count > 0)
-                  Positioned(
-                    right: 6,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: AppColors.electricBlue,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '$count',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+      appBar: SxAppBar(
+          title: const Text(
+            'Historial de viajes',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+          ),
+          actions: [
+            Obx(() {
+              final count = _controller.filters.value.activeCount;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    onPressed: _openFilters,
+                    icon: const Icon(Icons.filter_list_rounded),
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 6,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.electricBlue,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            );
-          }),
-          const SizedBox(width: 4),
-        ]),
+                ],
+              );
+            }),
+            const SizedBox(width: 4),
+          ]),
       body: Obx(() {
         if (_controller.isLoadingTrips.value) {
           return const Center(
@@ -130,11 +146,10 @@ class _TripHistoryListScreenState extends State<TripHistoryListScreen> {
         return RefreshIndicator(
           color: AppColors.royalBlue,
           onRefresh: _controller.loadTrips,
-          child: ListView.separated(
+          child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             itemCount: _controller.trips.length + 1,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               if (index == _controller.trips.length) {
                 return Obx(() => _controller.isLoadingMore.value
@@ -150,13 +165,23 @@ class _TripHistoryListScreenState extends State<TripHistoryListScreen> {
                     : const SizedBox.shrink());
               }
 
-              final trip = _controller.trips[index];
-              return _TripCard(
-                trip: trip,
-                onTap: () => Get.toNamed(
-                  RouteNames.tripEventHistory,
-                  arguments: trip.id,
-                ),
+              final round = _controller.trips[index];
+              final previous = index > 0 ? _controller.trips[index - 1] : null;
+              final showDay =
+                  previous == null || !_sameDay(previous.lastActivity, round.lastActivity);
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showDay) _DayHeader(date: round.lastActivity),
+                  _RoundCard(
+                    round: round,
+                    canAdd: !_isOperator && round.isOpen,
+                    onOpenTrip: (tripId) =>
+                        Get.toNamed(RouteNames.tripEventHistory, arguments: tripId),
+                    onAddMovement: () => _addMovement(round),
+                  ),
+                ],
               );
             },
           ),
@@ -166,155 +191,390 @@ class _TripHistoryListScreenState extends State<TripHistoryListScreen> {
   }
 }
 
-class _TripCard extends StatelessWidget {
-  final TripSummary trip;
-  final VoidCallback onTap;
-  const _TripCard({required this.trip, required this.onTap});
+class _DayHeader extends StatelessWidget {
+  final DateTime? date;
+  const _DayHeader({required this.date});
 
-  // "2026-08-21 00:00:00" → "21 Agosto, 00:00".
-  String? get _completionLabel {
-    final raw = trip.completionDatetime;
-    if (raw == null || raw.isEmpty) return null;
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) return raw;
-    return DateFormat("d MMMM, HH:mm", 'es_ES').format(parsed);
+  String get _label {
+    final d = date;
+    if (d == null) return '';
+    final today = DateTime.now();
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (d.year == today.year && d.month == today.month && d.day == today.day) return 'Hoy';
+    if (d.year == yesterday.year && d.month == yesterday.month && d.day == yesterday.day) {
+      return 'Ayer';
+    }
+    return DateFormat("d MMMM y", 'es_ES').format(d);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.electricBlue.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.route_rounded,
-                    color: AppColors.royalBlue, size: 21),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Viaje #${trip.tripNumber}',
-                            style: const TextStyle(
-                              color: AppColors.textDark,
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              height: 1.25,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        StatusBadge(
-                          code: trip.statusCode,
-                          label: trip.statusLabel.isNotEmpty
-                              ? trip.statusLabel
-                              : 'Desconocido',
-                          compact: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    if (trip.truckboxNum.isNotEmpty)
-                      _InfoRow(label: 'Caja', value: trip.truckboxNum),
-                    if (trip.operatorName != null && trip.operatorName!.isNotEmpty)
-                      _InfoRow(label: 'Operador', value: trip.operatorName!),
-                    _InfoRow(
-                        label: 'Origen',
-                        value: trip.origin.isNotEmpty ? trip.origin : '—'),
-                    _InfoRow(
-                        label: 'Destino',
-                        value: trip.destination.isNotEmpty
-                            ? trip.destination
-                            : '—'),
-                    if (trip.line != null && trip.line!.isNotEmpty)
-                      _InfoRow(label: 'Línea', value: trip.line!),
-                    if (trip.cargoType != null)
-                      _InfoRow(label: 'Tipo de carga', value: trip.cargoType!),
-                    if (trip.routeType != null)
-                      _InfoRow(label: 'Tipo', value: trip.routeType!),
-                    if (_completionLabel != null)
-                      _InfoRow(
-                          label: 'Fecha de finalización',
-                          value: _completionLabel!),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textLight, size: 20),
-            ],
-          ),
+    if (date == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Text(
+        _label.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.textMedium,
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
         ),
       ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
+/// Una ronda: todos sus movimientos en una sola tarjeta (con 1, 2 o más),
+/// en el orden de la ronda aunque se hayan registrado en momentos distintos.
+class _RoundCard extends StatelessWidget {
+  final TripRoundGroup round;
+  final bool canAdd;
+  final ValueChanged<int> onOpenTrip;
+  final VoidCallback onAddMovement;
+
+  const _RoundCard({
+    required this.round,
+    required this.canAdd,
+    required this.onOpenTrip,
+    required this.onAddMovement,
+  });
+
+  String get _title => round.isSingle
+      ? 'Viaje · ${round.operatorName ?? '—'}'
+      : 'Ronda · ${round.operatorName ?? '—'}';
+
+  (String, Color, Color) get _pill {
+    if (round.isSingle) return ('Viaje suelto', AppColors.fieldFill, AppColors.textMedium);
+    switch (round.state) {
+      case 'open':
+        return round.movements.length == 1
+            ? ('Solo ida', AppColors.fieldFill, AppColors.textMedium)
+            : ('Abierta', const Color(0xFFFFF3E0), const Color(0xFFED6C02));
+      case 'voided':
+        return ('Anulada', const Color(0xFFFDECEA), const Color(0xFFD32F2F));
+      default:
+        return ('Cerrada', const Color(0xFFE8F5E9), const Color(0xFF2E7D32));
+    }
+  }
+
+  String _roleLabel(TripRoundMovement m) {
+    if (m.role == 'single') return 'Viaje';
+    if (m.role == 'outbound') return 'Ida';
+    if (m.role == 'return') return 'Fin';
+    return 'Movimiento';
+  }
+
+  String? _registered(TripRoundMovement m) {
+    final d = parseServerDateTime(m.registeredAt);
+    return d == null ? null : DateFormat("EEE HH:mm", 'es_ES').format(d);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 3),
-      child: Row(
+    final pill = _pill;
+    final total = round.movements.length;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(Sx.cardRadius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalBlue.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(
-              color: AppColors.textLight,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFF4F8FF), Colors.white],
+              ),
+              border: Border(bottom: BorderSide(color: Color(0xFFE1E8F5))),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(_title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.navyBlue,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration:
+                          BoxDecoration(color: pill.$2, borderRadius: BorderRadius.circular(20)),
+                      child: Text(pill.$1,
+                          style:
+                              TextStyle(color: pill.$3, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ),
+                  ],
+                ),
+                if (round.circuit != null && round.circuit!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(round.circuit!,
+                      style: const TextStyle(color: AppColors.textMedium, fontSize: 12.5)),
+                ],
+                const SizedBox(height: 2),
+                Text(round.route,
+                    style: const TextStyle(
+                        color: AppColors.navyBlue, fontSize: 12.5, fontWeight: FontWeight.w700)),
+              ],
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textMedium,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: Column(
+              children: [
+                for (var i = 0; i < total; i++)
+                  _MovementRow(
+                    movement: round.movements[i],
+                    label: _roleLabel(round.movements[i]),
+                    registered: _registered(round.movements[i]),
+                    isFirst: i == 0,
+                    isLast: i == total - 1 && !round.isOpen,
+                    hasLine: i < total - 1 || (round.isOpen && round.nextOrigin != null),
+                    onTap: () => onOpenTrip(round.movements[i].trip.id),
+                  ),
+                if (round.isOpen && round.nextOrigin != null)
+                  _PendingRow(position: total + 1, origin: round.nextOrigin!),
+              ],
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Color(0xFFE1E8F5))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    round.state == 'closed'
+                        ? '${round.finishedCount} de $total terminados · ronda completa'
+                        : '${round.finishedCount} de $total terminados',
+                    style: const TextStyle(color: AppColors.textMedium, fontSize: 12.5),
+                  ),
+                ),
+                if (canAdd)
+                  InkWell(
+                    onTap: onAddMovement,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 4),
+                      child: Text('+ Agregar movimiento',
+                          style: TextStyle(
+                              color: AppColors.royalBlue,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Un movimiento dentro de la tarjeta de la ronda: punto + línea de tiempo.
+class _MovementRow extends StatelessWidget {
+  final TripRoundMovement movement;
+  final String label;
+  final String? registered;
+  final bool isFirst;
+  final bool isLast;
+  final bool hasLine;
+  final VoidCallback onTap;
+
+  const _MovementRow({
+    required this.movement,
+    required this.label,
+    required this.registered,
+    required this.isFirst,
+    required this.isLast,
+    required this.hasLine,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trip = movement.trip;
+    final filled = isFirst || isLast;
+    final color = isLast ? AppColors.navyBlue : AppColors.royalBlue;
+    final meta = [
+      if (trip.cargoType != null && trip.cargoType!.isNotEmpty) trip.cargoType!,
+      if (trip.truckboxNum.isNotEmpty) 'Caja ${trip.truckboxNum}',
+    ].join(' · ');
+
+    return InkWell(
+      onTap: onTap,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Rail(color: color, filled: filled, hasLine: hasLine),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(children: [
+                              TextSpan(
+                                  text: '#${trip.tripNumber}',
+                                  style: const TextStyle(color: AppColors.royalBlue)),
+                              TextSpan(text: ' · $label'),
+                            ]),
+                            style: const TextStyle(
+                                color: AppColors.textDark,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        StatusBadge(
+                          code: trip.statusCode,
+                          label: trip.statusLabel.isNotEmpty ? trip.statusLabel : 'Desconocido',
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${trip.origin.isNotEmpty ? trip.origin : '—'} → ${trip.destination.isNotEmpty ? trip.destination : '—'}',
+                      style: const TextStyle(color: AppColors.textDark, fontSize: 13),
+                    ),
+                    if (meta.isNotEmpty || registered != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text.rich(
+                          TextSpan(children: [
+                            if (meta.isNotEmpty) TextSpan(text: meta),
+                            if (meta.isNotEmpty && registered != null) const TextSpan(text: ' · '),
+                            if (registered != null)
+                              TextSpan(
+                                  text: 'registrado $registered',
+                                  style: const TextStyle(color: AppColors.textLight)),
+                          ]),
+                          style: const TextStyle(color: AppColors.textMedium, fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Riel de la línea de tiempo: punto del movimiento y línea hacia el siguiente.
+class _Rail extends StatelessWidget {
+  final Color color;
+  final bool filled;
+  final bool hasLine;
+  const _Rail({required this.color, required this.filled, required this.hasLine});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 20,
+      child: Column(
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: filled ? color : Colors.white,
+              border: Border.all(color: color, width: 3),
+            ),
+          ),
+          if (hasLine) Expanded(child: Container(width: 3, color: AppColors.lightBlue)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Siguiente movimiento todavía sin crear de una ronda abierta (atenuado).
+class _PendingRow extends StatelessWidget {
+  final int position;
+  final String origin;
+  const _PendingRow({required this.position, required this.origin});
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.75,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Rail(color: AppColors.textLight, filled: false, hasLine: false),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('$position · Siguiente',
+                            style: const TextStyle(
+                                color: AppColors.textDark,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: AppColors.fieldFill, borderRadius: BorderRadius.circular(20)),
+                        child: const Text('Sin crear',
+                            style: TextStyle(
+                                color: AppColors.textMedium,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text('$origin → ¿?',
+                      style: const TextStyle(color: AppColors.textDark, fontSize: 13)),
+                  const Text('Se agrega cuando se necesite',
+                      style: TextStyle(color: AppColors.textLight, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -331,8 +591,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.route_outlined,
-                size: 56, color: AppColors.royalBlue),
+            const Icon(Icons.route_outlined, size: 56, color: AppColors.royalBlue),
             const SizedBox(height: 14),
             const Text(
               'Aún no hay viajes',
@@ -368,8 +627,7 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 48, color: AppColors.errorRed),
+            const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.errorRed),
             const SizedBox(height: 14),
             Text(
               message,

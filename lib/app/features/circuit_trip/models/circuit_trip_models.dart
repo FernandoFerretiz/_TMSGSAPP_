@@ -30,8 +30,7 @@ class ClientCircuitOption {
     this.routeTypeName,
   });
 
-  factory ClientCircuitOption.fromJson(Map<String, dynamic> json) =>
-      ClientCircuitOption(
+  factory ClientCircuitOption.fromJson(Map<String, dynamic> json) => ClientCircuitOption(
         id: json['id'] as int,
         name: (json['name'] ?? '').toString(),
         routeTypeName: json['route_type_name']?.toString(),
@@ -56,8 +55,7 @@ class CircuitOperatorOption {
     this.transporterName,
   });
 
-  factory CircuitOperatorOption.fromJson(Map<String, dynamic> json) =>
-      CircuitOperatorOption(
+  factory CircuitOperatorOption.fromJson(Map<String, dynamic> json) => CircuitOperatorOption(
         id: json['id'] as int,
         name: (json['name'] ?? '').toString(),
         transporterId: json['transporter_id'] as int,
@@ -65,8 +63,7 @@ class CircuitOperatorOption {
       );
 
   @override
-  bool operator ==(Object other) =>
-      other is CircuitOperatorOption && other.id == id;
+  bool operator ==(Object other) => other is CircuitOperatorOption && other.id == id;
   @override
   int get hashCode => id.hashCode;
 }
@@ -101,16 +98,14 @@ class AdditionalMaterialOption {
     required this.group,
   });
 
-  factory AdditionalMaterialOption.fromJson(Map<String, dynamic> json) =>
-      AdditionalMaterialOption(
+  factory AdditionalMaterialOption.fromJson(Map<String, dynamic> json) => AdditionalMaterialOption(
         id: json['id'] as int,
         name: (json['name'] ?? '').toString(),
         group: (json['group'] ?? '').toString(),
       );
 
   @override
-  bool operator ==(Object other) =>
-      other is AdditionalMaterialOption && other.id == id;
+  bool operator ==(Object other) => other is AdditionalMaterialOption && other.id == id;
   @override
   int get hashCode => id.hashCode;
 }
@@ -137,8 +132,7 @@ class AdditionalMaterialSelection {
         'additional_material_id': additionalMaterialId,
         'custom_name': customName.trim().isEmpty ? null : customName.trim(),
         'quantity': quantity.trim().isEmpty ? null : quantity.trim(),
-        'delivery_location':
-            deliveryLocation.trim().isEmpty ? null : deliveryLocation.trim(),
+        'delivery_location': deliveryLocation.trim().isEmpty ? null : deliveryLocation.trim(),
       };
 }
 
@@ -161,6 +155,11 @@ class OperatorLegResolution {
   final int? roundId;
   final String? outboundTruckboxNum;
   final List<AddressOption> returnOriginOptions;
+  // Vuelta abierta con N movimientos: siguiente posición y origen fijo (donde
+  // terminó el último movimiento). nextOrigin null = se elige de las opciones.
+  final int? nextPosition;
+  final AddressOption? nextOrigin;
+  final List<RoundMovement> movements;
 
   const OperatorLegResolution({
     required this.leg,
@@ -174,12 +173,14 @@ class OperatorLegResolution {
     this.roundId,
     this.outboundTruckboxNum,
     this.returnOriginOptions = const [],
+    this.nextPosition,
+    this.nextOrigin,
+    this.movements = const [],
   });
 
   bool get isReturn => leg == CircuitLeg.returnLeg;
 
-  factory OperatorLegResolution.fromJson(Map<String, dynamic> json) =>
-      OperatorLegResolution(
+  factory OperatorLegResolution.fromJson(Map<String, dynamic> json) => OperatorLegResolution(
         leg: json['leg'] == 'return' ? CircuitLeg.returnLeg : CircuitLeg.outbound,
         operatorId: json['operator_id'] as int,
         transporterId: json['transporter_id'] as int,
@@ -197,6 +198,53 @@ class OperatorLegResolution {
         returnOriginOptions: (json['return_origin_options'] as List? ?? [])
             .map((e) => AddressOption.fromJson(e as Map<String, dynamic>))
             .toList(),
+        movements: (json['movements'] as List? ?? [])
+            .map((e) => RoundMovement.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        nextPosition: json['next_position'] as int?,
+        nextOrigin: json['next_origin'] != null
+            ? AddressOption.fromJson(json['next_origin'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
+/// Movimiento ya creado de una vuelta abierta (historial de la línea de tiempo).
+class RoundMovement {
+  final int? tripId;
+  final bool canRemove;
+  final int position;
+  final String role; // outbound | intermediate | return
+  final String? origin;
+  final String? destination;
+  final String? typeTrip;
+  final String? truckboxNum;
+  final String? status;
+  final String? statusLabel;
+
+  const RoundMovement({
+    this.tripId,
+    this.canRemove = false,
+    required this.position,
+    required this.role,
+    this.origin,
+    this.destination,
+    this.typeTrip,
+    this.truckboxNum,
+    this.status,
+    this.statusLabel,
+  });
+
+  factory RoundMovement.fromJson(Map<String, dynamic> json) => RoundMovement(
+        tripId: _asInt(json['trip_id']),
+        canRemove: json['can_remove'] == true,
+        position: (json['position'] as num).toInt(),
+        role: json['role']?.toString() ?? 'intermediate',
+        origin: json['origin']?.toString(),
+        destination: json['destination']?.toString(),
+        typeTrip: json['type_trip']?.toString(),
+        truckboxNum: json['truckbox_num']?.toString(),
+        status: json['status']?.toString(),
+        statusLabel: json['status_label']?.toString(),
       );
 }
 
@@ -225,6 +273,10 @@ class TripEditData {
   final String? truckboxOwner;
   final List<AdditionalMaterialSelection> additionalMaterials;
   final List<AddressOption> addressOptions;
+  // Intermedio o fin que todavía no inicia: se puede eliminar de la vuelta.
+  final bool canRemove;
+  // Último movimiento de una vuelta abierta: se le pueden agregar más trayectos.
+  final bool canAddMovements;
 
   const TripEditData({
     required this.id,
@@ -246,6 +298,8 @@ class TripEditData {
     this.truckboxOwner,
     this.additionalMaterials = const [],
     this.addressOptions = const [],
+    this.canRemove = false,
+    this.canAddMovements = false,
   });
 
   factory TripEditData.fromJson(Map<String, dynamic> json) {
@@ -260,15 +314,24 @@ class TripEditData {
         .toList();
 
     return TripEditData(
+      canRemove: json['can_remove'] == true,
+      canAddMovements: json['can_add_movements'] == true,
       id: _asInt(json['id'])!,
       client: CircuitOption.fromJson(json['client'] as Map<String, dynamic>),
       clientCircuitId: _asInt(json['client_circuit_id'])!,
-      leg: json['circuit_leg'] == 'return' ? CircuitLeg.returnLeg : CircuitLeg.outbound,
+      // Un intermedio se edita igual que el regreso: origen elegible, destino propio.
+      leg: (json['circuit_leg'] == 'return' || json['circuit_leg'] == 'intermediate')
+          ? CircuitLeg.returnLeg
+          : CircuitLeg.outbound,
       operator: CircuitOperatorOption.fromJson(json['operator'] as Map<String, dynamic>),
       unitId: _asInt(json['unit_id']),
       usesOwnTruckboxes: json['uses_own_truckboxes'] == true,
-      origin: json['origin'] != null ? AddressOption.fromJson(json['origin'] as Map<String, dynamic>) : null,
-      destination: json['destination'] != null ? AddressOption.fromJson(json['destination'] as Map<String, dynamic>) : null,
+      origin: json['origin'] != null
+          ? AddressOption.fromJson(json['origin'] as Map<String, dynamic>)
+          : null,
+      destination: json['destination'] != null
+          ? AddressOption.fromJson(json['destination'] as Map<String, dynamic>)
+          : null,
       routeTypeId: _asInt(json['route_type_id']),
       typeTrip: json['type_trip']?.toString(),
       loadingAppointmentDatetime: json['loading_appointment_datetime'] != null

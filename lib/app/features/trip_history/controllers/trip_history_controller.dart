@@ -11,8 +11,8 @@ class TripHistoryController extends GetxController {
 
   TripHistoryController(this._service);
 
-  // ── Lista de viajes ──────────────────────────────────────────────────
-  final trips = <TripSummary>[].obs;
+  // ── Lista de viajes (una tarjeta por ronda) ───────────────────────────
+  final trips = <TripRoundGroup>[].obs;
   final isLoadingTrips = false.obs;
   final isLoadingMore = false.obs;
   final tripsErrorMessage = ''.obs;
@@ -108,17 +108,21 @@ class TripHistoryController extends GetxController {
   final Rxn<TripSummary> tripHeader = Rxn<TripSummary>();
   final events = <TripEvent>[].obs;
   final documents = <TripEvidenceFile>[].obs;
+  final stages = <String, TripStage>{}.obs;
   final isLoadingHistory = false.obs;
   final historyErrorMessage = ''.obs;
 
-  Future<void> loadHistory(int tripId) async {
-    isLoadingHistory.value = true;
+  // [silent]: recarga sin el spinner de pantalla completa (pull-to-refresh),
+  // para no desmontar la lista mientras se desliza.
+  Future<void> loadHistory(int tripId, {bool silent = false}) async {
+    if (!silent) isLoadingHistory.value = true;
     historyErrorMessage.value = '';
     try {
       final detail = await _service.getHistory(tripId);
       tripHeader.value = detail.trip;
       events.value = detail.events;
       documents.value = detail.documents;
+      stages.value = detail.stages;
     } catch (_) {
       historyErrorMessage.value = 'No se pudo cargar el historial del viaje.';
     } finally {

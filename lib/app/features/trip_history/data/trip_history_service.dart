@@ -5,7 +5,7 @@ import '../models/trip_filter_option.dart';
 import '../models/trip_summary.dart';
 
 class TripPage {
-  final List<TripSummary> trips;
+  final List<TripRoundGroup> trips;
   final int currentPage;
   final int lastPage;
 
@@ -22,11 +22,14 @@ class TripHistoryDetail {
   final TripSummary trip;
   final List<TripEvent> events;
   final List<TripEvidenceFile> documents;
+  // 'start' / 'end' → evidencias y documentos de esa etapa.
+  final Map<String, TripStage> stages;
 
   const TripHistoryDetail({
     required this.trip,
     required this.events,
     this.documents = const [],
+    this.stages = const {},
   });
 }
 
@@ -84,7 +87,7 @@ class TripHistoryService {
     TripHistoryFilters filters = const TripHistoryFilters(),
   }) async {
     final response = await _apiClient.dio.get(
-      '/api/mobile/trips',
+      '/api/mobile/trips/rounds',
       queryParameters: {'page': page, ...filters.toQueryParameters()},
     );
     final body = response.data as Map<String, dynamic>;
@@ -93,7 +96,7 @@ class TripHistoryService {
 
     return TripPage(
       trips: data
-          .map((e) => TripSummary.fromJson(e as Map<String, dynamic>))
+          .map((e) => TripRoundGroup.fromJson(e as Map<String, dynamic>))
           .toList(),
       currentPage: (meta['current_page'] as int?) ?? page,
       lastPage: (meta['last_page'] as int?) ?? page,
@@ -138,6 +141,11 @@ class TripHistoryService {
       documents: documents
           .map((e) => TripEvidenceFile.fromJson(e as Map<String, dynamic>))
           .toList(),
+      stages: {
+        for (final e in ((body['stages'] as Map<String, dynamic>?) ?? const {})
+            .entries)
+          e.key: TripStage.fromJson(e.value as Map<String, dynamic>),
+      },
     );
   }
 

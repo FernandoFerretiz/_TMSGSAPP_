@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 import java.io.FileInputStream
 
@@ -7,6 +8,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
 }
+
+// --dart-define=ENV=staging: otro applicationId y otro nombre para poder instalarlo
+// junto con la app de producción. Flutter pasa los dart-defines a Gradle codificados
+// en base64 (KEY=VALUE separados por coma).
+val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String? ?: "")
+    .split(",")
+    .filter { it.isNotEmpty() }
+    .map { String(Base64.getDecoder().decode(it)) }
+    .filter { it.contains("=") }
+    .associate { it.substringBefore("=") to it.substringAfter("=") }
+val isStagingBuild = dartDefines["ENV"] == "staging"
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -44,12 +56,12 @@ android {
     productFlavors {
         create("operators") {
             dimension = "role"
-            resValue("string", "app_name", "TMS Operadores")
+            resValue("string", "app_name", "SultánX TMS Operadores")
         }
         create("staff") {
             dimension = "role"
             applicationIdSuffix = ".staff"
-            resValue("string", "app_name", "TMS Staff")
+            resValue("string", "app_name", "SultánX TMS Staff")
         }
     }
 
@@ -65,8 +77,18 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (isStagingBuild) {
+                applicationIdSuffix = ".staging"
+                resValue("string", "app_name", "SultánX TMS (Staging)")
+            }
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
+            if (isStagingBuild) {
+                applicationIdSuffix = ".staging"
+                resValue("string", "app_name", "SultánX TMS (Staging)")
+            }
         }
     }
 }

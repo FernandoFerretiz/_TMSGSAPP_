@@ -82,12 +82,14 @@ class _EventCard extends StatelessWidget {
         TripEventType.incident => const Color(0xFFDC2626),
         TripEventType.stop => _kCriticalColor,
         TripEventType.status => const Color(0xFF2563EB),
+        TripEventType.log => const Color(0xFF0D9488),
       };
 
   IconData get _icon => switch (event.type) {
         TripEventType.incident => Icons.warning_amber_rounded,
         TripEventType.stop => Icons.pause_circle_outline_rounded,
         TripEventType.status => Icons.swap_horiz_rounded,
+        TripEventType.log => Icons.edit_note_rounded,
       };
 
   String? get _timeLabel {

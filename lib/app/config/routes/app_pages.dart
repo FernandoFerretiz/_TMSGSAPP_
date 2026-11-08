@@ -1,4 +1,9 @@
 import 'package:get/get.dart';
+import '../../features/internal_expenses/bindings/internal_expense_binding.dart';
+import '../../features/internal_expenses/screens/internal_expense_calendar_screen.dart';
+import '../../features/internal_expenses/screens/internal_expense_detail_screen.dart';
+import '../../features/internal_expenses/screens/internal_expense_form_screen.dart';
+import '../../features/internal_expenses/screens/internal_expenses_list_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/activate_account_screen.dart';
@@ -12,20 +17,24 @@ import '../../features/trips/screens/trip_additional_materials_screen.dart';
 import '../../features/trips/screens/seal_capture_screen.dart';
 // DashboardBinding is declared as `part of dashboard` inside dashboard_screen.dart
 import '../../features/dashboard/views/screens/dashboard_screen.dart';
-import '../../features/chatbot/screens/chatbot_screen.dart';
-import '../../features/chatbot/bindings/chatbot_binding.dart';
 import '../../features/incidents/screens/report_incident_screen.dart';
 import '../../features/incidents/bindings/incident_binding.dart';
+import '../../features/trip_log/bindings/trip_log_binding.dart';
+import '../../features/trip_log/screens/report_hub_screen.dart';
+import '../../features/trip_log/screens/trip_log_status_screen.dart';
 import '../../features/trip_history/screens/trip_history_list_screen.dart';
 import '../../features/trip_history/screens/trip_event_history_screen.dart';
 import '../../features/trip_history/screens/last_events_screen.dart';
 import '../../features/circuit_trip/screens/circuit_trip_form_screen.dart';
 import '../../features/circuit_trip/bindings/circuit_trip_binding.dart';
 import '../../features/trip_history/bindings/trip_history_binding.dart';
+import '../../features/alerts/screens/alerts_screen.dart';
 import '../../features/shift_coverage/screens/shift_coverage_list_screen.dart';
 import '../../features/shift_coverage/screens/start_coverage_screen.dart';
 import '../../features/shift_coverage/bindings/shift_coverage_binding.dart';
 import '../../features/staff/screens/staff_home_screen.dart';
+import '../../features/operator_template/operator_template_screen.dart';
+import '../../features/unit_status/unit_status_screen.dart';
 import '../app_flavor.dart';
 import 'route_names.dart';
 
@@ -84,6 +93,43 @@ class AppPages {
       name: _Paths.home,
       page: () => const StaffHomeScreen(),
     ),
+    GetPage(
+      name: _Paths.operatorTemplates,
+      page: () => const OperatorTemplateScreen(),
+    ),
+    GetPage(
+      name: _Paths.unitStatuses,
+      page: () => const UnitStatusScreen(),
+    ),
+    GetPage(
+      name: _Paths.staffReport,
+      page: () => const UnitStatusScreen(reportOnly: true),
+    ),
+    // Gastos internos: solo flavor staff; cada pantalla/acción además exige su permiso en el servidor.
+    GetPage(
+      name: _Paths.internalExpenses,
+      page: () => const InternalExpensesListScreen(),
+      binding: InternalExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.alerts,
+      page: () => const AlertsScreen(),
+    ),
+    GetPage(
+      name: _Paths.internalExpenseDetail,
+      page: () => const InternalExpenseDetailScreen(),
+      binding: InternalExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.internalExpenseForm,
+      page: () => const InternalExpenseFormScreen(),
+      binding: InternalExpenseBinding(),
+    ),
+    GetPage(
+      name: _Paths.internalExpenseCalendar,
+      page: () => const InternalExpenseCalendarScreen(),
+      binding: InternalExpenseBinding(),
+    ),
   ];
 
   static final _operatorRoutes = <GetPage>[
@@ -132,9 +178,13 @@ class AppPages {
       binding: IncidentBinding(),
     ),
     GetPage(
-      name: _Paths.chatbot,
-      page: () => const ChatBotScreen(),
-      binding: ChatBotBinding(),
+      name: _Paths.reportHub,
+      page: () => const ReportHubScreen(),
+    ),
+    GetPage(
+      name: _Paths.tripLogStatus,
+      page: () => const TripLogStatusScreen(),
+      binding: TripLogBinding(),
     ),
     GetPage(
       name: _Paths.shiftCoverageList,

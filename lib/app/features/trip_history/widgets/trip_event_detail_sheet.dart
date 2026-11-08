@@ -24,17 +24,22 @@ import 'status_badge.dart';
 class TripEventDetailSheet extends StatefulWidget {
   final TripSummary trip;
   final TripEvent event;
+  // Hoja de una etapa (Inicio / Finalización): siempre muestra las secciones
+  // de Evidencias y Documentos, aunque estén vacías.
+  final bool stageView;
 
   const TripEventDetailSheet({
     super.key,
     required this.trip,
     required this.event,
+    this.stageView = false,
   });
 
   static Future<void> show(
     BuildContext context, {
     required TripSummary trip,
     required TripEvent event,
+    bool stageView = false,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -43,7 +48,8 @@ class TripEventDetailSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => TripEventDetailSheet(trip: trip, event: event),
+      builder: (_) =>
+          TripEventDetailSheet(trip: trip, event: event, stageView: stageView),
     );
   }
 
@@ -56,6 +62,8 @@ class _TripEventDetailSheetState extends State<TripEventDetailSheet> {
   // while letting the operator uncheck what they don't want to send.
   late Set<int> _selected =
       Set<int>.from(List.generate(widget.event.files.length, (i) => i));
+  late Set<int> _selectedDocs =
+      Set<int>.from(List.generate(widget.event.documents.length, (i) => i));
 
   bool get _isIncident => widget.event.type == TripEventType.incident;
 
@@ -147,7 +155,7 @@ class _TripEventDetailSheetState extends State<TripEventDetailSheet> {
               ),
             if (event.files.isNotEmpty)
               _Section(
-                title: 'Evidencia — toca una foto para verla, marca las que quieras enviar',
+                title: 'Evidencias — toca una foto para verla, marca las que quieras enviar',
                 child: _EvidenceGallery(
                   files: event.files,
                   selected: _selected,
@@ -159,6 +167,33 @@ class _TripEventDetailSheetState extends State<TripEventDetailSheet> {
                     }
                   }),
                 ),
+              )
+            else if (widget.stageView)
+              const _Section(
+                title: 'Evidencias',
+                child: Text('Sin evidencias en esta etapa.',
+                    style: TextStyle(color: AppColors.textMedium, fontSize: 13.5)),
+              ),
+            if (event.documents.isNotEmpty)
+              _Section(
+                title: 'Documentos — toca uno para verlo, marca los que quieras enviar',
+                child: _EvidenceGallery(
+                  files: event.documents,
+                  selected: _selectedDocs,
+                  onToggle: (i) => setState(() {
+                    if (_selectedDocs.contains(i)) {
+                      _selectedDocs.remove(i);
+                    } else {
+                      _selectedDocs.add(i);
+                    }
+                  }),
+                ),
+              )
+            else if (widget.stageView)
+              const _Section(
+                title: 'Documentos',
+                child: Text('Sin documentos en esta etapa.',
+                    style: TextStyle(color: AppColors.textMedium, fontSize: 13.5)),
               ),
             const SizedBox(height: 12),
             _ShareTextButton(trip: trip, event: event),
@@ -167,6 +202,14 @@ class _TripEventDetailSheetState extends State<TripEventDetailSheet> {
               files: event.files,
               selected: _selected,
             ),
+            if (event.documents.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _ShareEvidenceButton(
+                files: event.documents,
+                selected: _selectedDocs,
+                noun: 'documento',
+              ),
+            ],
           ],
         ),
       ),
@@ -500,7 +543,13 @@ class _ShareTextButton extends StatelessWidget {
 class _ShareEvidenceButton extends StatefulWidget {
   final List<TripEvidenceFile> files;
   final Set<int> selected;
-  const _ShareEvidenceButton({required this.files, required this.selected});
+  // 'evidencia' | 'documento' — solo para los textos del botón.
+  final String noun;
+  const _ShareEvidenceButton({
+    required this.files,
+    required this.selected,
+    this.noun = 'evidencia',
+  });
 
   @override
   State<_ShareEvidenceButton> createState() => _ShareEvidenceButtonState();
@@ -552,10 +601,12 @@ class _ShareEvidenceButtonState extends State<_ShareEvidenceButton> {
             : const Icon(Icons.photo_library_outlined),
         label: Text(
           !hasFiles
-              ? 'Sin evidencia para compartir'
+              ? 'Sin ${widget.noun} para compartir'
               : count == 0
-                  ? 'Selecciona al menos una foto'
-                  : 'Compartir evidencia ($count)',
+                  ? 'Selecciona al menos un archivo'
+                  : widget.noun == 'documento'
+                      ? 'Compartir documentos ($count)'
+                      : 'Compartir evidencia ($count)',
         ),
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.royalBlue,

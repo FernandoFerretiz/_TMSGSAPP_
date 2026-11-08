@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:battery_plus/battery_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -53,6 +54,7 @@ class TmsLocationHandler extends TaskHandler {
   Position? _lastIdlePosition;
 
   bool _isFlushing = false;
+  bool _isDestroying = false;
   int _consecutiveFailures = 0;
   int _skipTicks = 0;
 
@@ -166,26 +168,55 @@ class TmsLocationHandler extends TaskHandler {
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+    _isDestroying = true;
     await _positionSub?.cancel();
     // Best-effort final flush before tearing down, then drop whatever
     // remains — a stopped/switched trip's leftover backlog isn't retried.
-    await _flush();
+    // Idle tracking (no trip) has nothing to flush: its heartbeat would
+    // reach the server AFTER the operator's manual "Detener rastreo" and
+    // turn tracking back on there (the ping reactivates it by design).
+    if (_tripId != null) await _flush();
     if (_tripId != null) {
       await _queue.clearForTrip(_tripId!);
     }
     _dio?.close();
   }
 
+  final Battery _battery = Battery();
+
+  /// Battery state of the phone, sent along with every flush/ping so the
+  /// server can alert on a low battery. The thresholds live in the TMS
+  /// settings; the app only reports. Best-effort: never blocks a flush.
+  Future<Map<String, dynamic>> _batteryPayload() async {
+    try {
+      final level = await _battery.batteryLevel;
+      final state = await _battery.batteryState;
+      return {
+        'battery': {
+          'level': level,
+          'charging':
+              state == BatteryState.charging || state == BatteryState.full,
+        },
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
   /// Idle tracking (no trip): one lightweight heartbeat with the latest fix.
   Future<void> _pingIdle() async {
     final position = _lastIdlePosition;
-    if (_isFlushing || _dio == null || position == null) return;
+    if (_isDestroying || _isFlushing || _dio == null || position == null) return;
 
     _isFlushing = true;
     try {
       await _dio!.post(
         '/api/mobile/tracking/ping',
-        data: {'latitude': position.latitude, 'longitude': position.longitude},
+        data: {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          ...await _batteryPayload(),
+        },
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[TRACKING] Error en ping sin viaje: $e');
@@ -218,7 +249,10 @@ class TmsLocationHandler extends TaskHandler {
       }
       final response = await _dio!.post(
         '/api/mobile/trips/$_tripId/locations',
-        data: {'locations': batch.map((s) => s.toApiJson()).toList()},
+        data: {
+          'locations': batch.map((s) => s.toApiJson()).toList(),
+          ...await _batteryPayload(),
+        },
       );
 
       // Only the server-acknowledged points are removed — a partial/failed

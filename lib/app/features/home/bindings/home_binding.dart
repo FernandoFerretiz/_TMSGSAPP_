@@ -6,8 +6,6 @@ import '../../location/services/location_service.dart';
 import '../../location/services/tracking_service.dart';
 import '../../trips/controllers/trip_controller.dart';
 import '../../trips/data/trip_service.dart';
-import '../../chatbot/controllers/chatbot_controller.dart';
-import '../../chatbot/data/chatbot_service.dart';
 import '../../../core/network/api_client.dart';
 import '../controllers/home_controller.dart';
 
@@ -24,7 +22,5 @@ class HomeBinding extends Bindings {
     Get.lazyPut(
       () => HomeController(Get.find<AuthController>()),
     );
-    Get.lazyPut(() => ChatBotService(Get.find<ApiClient>()));
-    Get.lazyPut(() => ChatBotController(Get.find<ChatBotService>()));
   }
 }

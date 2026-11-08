@@ -1,6 +1,7 @@
 import 'trip_evidence_file.dart';
+import '../../../utils/helpers/server_time.dart';
 
-enum TripEventType { status, incident, stop }
+enum TripEventType { status, incident, stop, log }
 
 /// A single answered checklist question for a status-change event (e.g. the
 /// "Inicio de viaje" pre-trip checklist), with its own photos if any.
@@ -76,6 +77,9 @@ class TripEvent {
   final String? actorName;
   final DateTime? timestamp;
   final List<TripEvidenceFile> files;
+  // Documentos de backoffice (carta porte, RC, POD…) — distintos de [files],
+  // que son las evidencias (fotos) que sube el operador. Solo en detalle de etapa.
+  final List<TripEvidenceFile> documents;
   // Only set for type == status: assigned|started|arrived|finished.
   final String? statusCode;
   // Security seal code, parsed by the backend from the status-change
@@ -91,6 +95,11 @@ class TripEvent {
   // (se reordenan al tope del feed en cada recordatorio) — ver
   // MobileTripHistoryController::CRITICAL_EVENT_TYPES en el backend.
   final bool eventoCritico;
+  // Solo en problemas (type == incident): estado de atención de su alerta
+  // (pending | in_attention | resolved), con su etiqueta y quién la atiende.
+  final String? attentionStatus;
+  final String? attentionLabel;
+  final String? attentionBy;
   // Solo viene poblado en el feed de "Últimos eventos" (varios viajes a la
   // vez); null cuando el evento viene del timeline de un solo viaje.
   final TripEventTripContext? trip;
@@ -102,12 +111,16 @@ class TripEvent {
     this.actorName,
     this.timestamp,
     this.files = const [],
+    this.documents = const [],
     this.statusCode,
     this.sealCode,
     this.checklist = const [],
     this.canContinueTrip,
     this.extraFields = const [],
     this.eventoCritico = false,
+    this.attentionStatus,
+    this.attentionLabel,
+    this.attentionBy,
     this.trip,
   });
 
@@ -115,13 +128,14 @@ class TripEvent {
         type: switch (json['type']) {
           'incident' => TripEventType.incident,
           'stop' => TripEventType.stop,
+          'log' => TripEventType.log,
           _ => TripEventType.status,
         },
         title: (json['title'] ?? '').toString(),
         subtitle: json['subtitle']?.toString(),
         actorName: json['actor_name']?.toString(),
         timestamp: json['timestamp'] != null
-            ? DateTime.tryParse(json['timestamp'].toString())
+            ? parseServerDateTime(json['timestamp'])
             : null,
         files: (json['files'] as List? ?? [])
             .map((e) => TripEvidenceFile.fromJson(e as Map<String, dynamic>))
@@ -137,8 +151,83 @@ class TripEvent {
             .map((e) => TripEventExtraField.fromJson(e as Map<String, dynamic>))
             .toList(),
         eventoCritico: json['evento_critico'] as bool? ?? false,
+        attentionStatus:
+            (json['attention'] as Map<String, dynamic>?)?['status']?.toString(),
+        attentionLabel:
+            (json['attention'] as Map<String, dynamic>?)?['label']?.toString(),
+        attentionBy:
+            (json['attention'] as Map<String, dynamic>?)?['by']?.toString(),
         trip: json['trip'] != null
             ? TripEventTripContext.fromJson(json['trip'] as Map<String, dynamic>)
             : null,
+      );
+}
+
+/// Evidencias y documentos de una etapa del viaje (inicio / finalización),
+/// junto con las notas, checklist y sello de su cambio de estatus.
+class TripStage {
+  final String stage; // 'start' | 'end'
+  final String label;
+  final String title;
+  final String? statusCode;
+  final String? subtitle;
+  final String? actorName;
+  final DateTime? timestamp;
+  final String? sealCode;
+  final List<TripEventChecklistAnswer> checklist;
+  final List<TripEvidenceFile> evidence;
+  final List<TripEvidenceFile> documents;
+
+  const TripStage({
+    required this.stage,
+    required this.label,
+    required this.title,
+    this.statusCode,
+    this.subtitle,
+    this.actorName,
+    this.timestamp,
+    this.sealCode,
+    this.checklist = const [],
+    this.evidence = const [],
+    this.documents = const [],
+  });
+
+  int get totalFiles => evidence.length + documents.length;
+
+  factory TripStage.fromJson(Map<String, dynamic> json) => TripStage(
+        stage: (json['stage'] ?? '').toString(),
+        label: (json['label'] ?? '').toString(),
+        title: (json['title'] ?? '').toString(),
+        statusCode: json['status_code']?.toString(),
+        subtitle: json['subtitle']?.toString(),
+        actorName: json['actor_name']?.toString(),
+        timestamp: json['timestamp'] != null
+            ? parseServerDateTime(json['timestamp'])
+            : null,
+        sealCode: json['seal_code']?.toString(),
+        checklist: (json['checklist'] as List? ?? [])
+            .map((e) =>
+                TripEventChecklistAnswer.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        evidence: (json['evidence'] as List? ?? [])
+            .map((e) => TripEvidenceFile.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        documents: (json['documents'] as List? ?? [])
+            .map((e) => TripEvidenceFile.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  /// Evento equivalente para reutilizar la hoja de detalle.
+  TripEvent toEvent() => TripEvent(
+        type: TripEventType.status,
+        title: title,
+        subtitle: subtitle,
+        actorName: actorName,
+        timestamp: timestamp,
+        files: evidence,
+        documents: documents,
+        statusCode: statusCode,
+        sealCode: sealCode,
+        checklist: checklist,
       );
 }

@@ -312,10 +312,6 @@ class _ChangeStatusScreenState extends State<ChangeStatusScreen> {
     return Obx(() {
       final resp = _tc.activeTripResponse;
       final canFinish = resp?.canFinishTrip ?? false;
-      final hasOptionalActions = resp != null &&
-          (resp.canReportToClient ||
-              resp.canMarkRampAssigned ||
-              resp.canMarkLoadingUnloading);
 
       final evidence = _tc.evidence.value;
       final requiresEnd = evidence?.requiresEndEvidence ?? true;
@@ -364,76 +360,18 @@ class _ChangeStatusScreenState extends State<ChangeStatusScreen> {
                             const SizedBox(height: 16),
                           ],
 
-                          // Los 3 estados opcionales de patio — no
-                          // obligatorios, se pueden saltar; el backend decide
-                          // cuáles aplican en este punto (orden fijo:
-                          // reportado -> rampa -> carga). Cada botón solo abre
-                          // la pantalla de foto+comentario para esa acción
-                          // puntual — no se pide nada por adelantado aquí.
-                          if (hasOptionalActions) ...[
-                            EvBox(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Registrar avance',
-                                      style: TextStyle(
-                                          color: Ev.text,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800)),
-                                  const SizedBox(height: 3),
-                                  const Text(
-                                      'Opcional: registra en qué punto del '
-                                      'patio vas.',
-                                      style: TextStyle(
-                                          color: Ev.gray500, fontSize: 12)),
-                                  const SizedBox(height: 12),
-                                  if (resp.canReportToClient)
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 12),
-                                      child: _EvTapCard(
-                                        icon: Icons.forum_outlined,
-                                        title: 'Reportado con cliente',
-                                        description: 'Toca para registrar',
-                                        onTap: () => Get.to(
-                                            () => TripProgressActionScreen(
-                                                  title: 'Reportado con cliente',
-                                                  action: _tc.reportToClient,
-                                                )),
-                                      ),
-                                    ),
-                                  if (resp.canMarkRampAssigned)
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 12),
-                                      child: _EvTapCard(
-                                        icon: Icons.warehouse_outlined,
-                                        title: 'Rampa asignada',
-                                        description: 'Toca para registrar',
-                                        onTap: () => Get.to(
-                                            () => TripProgressActionScreen(
-                                                  title: 'Rampa asignada',
-                                                  action: _tc.markRampAssigned,
-                                                )),
-                                      ),
-                                    ),
-                                  if (resp.canMarkLoadingUnloading)
-                                    _EvTapCard(
-                                      icon: Icons.inventory_2_outlined,
-                                      title: 'Cargando/Descargando',
-                                      description: 'Toca para registrar',
-                                      onTap: () => Get.to(
-                                          () => TripProgressActionScreen(
-                                                title: 'Cargando/Descargando',
-                                                action:
-                                                    _tc.markLoadingUnloading,
-                                              )),
-                                    ),
-                                ],
-                              ),
+                          // Los estados de patio ya no se registran como estados
+                          // del viaje: ahora son entradas de la bitácora
+                          // (Reportar… > Estatus).
+                          EvBox(
+                            child: _EvTapCard(
+                              icon: Icons.edit_note_rounded,
+                              title: 'Reportar…',
+                              description: 'Estatus o problema del viaje',
+                              onTap: () => Get.toNamed(RouteNames.reportHub),
                             ),
-                            const SizedBox(height: 16),
-                          ],
+                          ),
+                          const SizedBox(height: 16),
 
                           if (canFinish)
                             _EvStage(
@@ -1049,6 +987,17 @@ class _EvHero extends StatelessWidget {
   final TripModel trip;
   const _EvHero({required this.trip});
 
+  String? get _origUrl {
+    if (trip.originMapsUrl != null && trip.originMapsUrl!.isNotEmpty) {
+      return trip.originMapsUrl;
+    }
+    if (trip.originLatitude != null && trip.originLongitude != null) {
+      return 'https://www.google.com/maps?q='
+          '${trip.originLatitude},${trip.originLongitude}';
+    }
+    return null;
+  }
+
   String? get _destUrl {
     if (trip.destinationMapsUrl != null && trip.destinationMapsUrl!.isNotEmpty) {
       return trip.destinationMapsUrl;
@@ -1064,6 +1013,31 @@ class _EvHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final date = _tripDateLabel(trip);
     final destUrl = _destUrl;
+    final origUrl = _origUrl;
+
+    Widget mapPill(String label, String url) => GestureDetector(
+          onTap: () =>
+              launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.location_on_rounded, size: 15, color: Ev.navy),
+                const SizedBox(width: 4),
+                Text(label,
+                    style: const TextStyle(
+                        color: Ev.navy,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        );
 
     Widget eyebrow(String text) => Text(text.toUpperCase(),
         style: const TextStyle(
@@ -1122,24 +1096,15 @@ class _EvHero extends StatelessWidget {
               ],
             ),
           ),
-          if (destUrl != null) ...[
+          if (origUrl != null || destUrl != null) ...[
             const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () => launchUrl(Uri.parse(destUrl),
-                  mode: LaunchMode.externalApplication),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: const Text('📍 Ver destino en el mapa',
-                    style: TextStyle(
-                        color: Ev.navy,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800)),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (origUrl != null) mapPill('Ver origen en el mapa', origUrl),
+                if (destUrl != null) mapPill('Ver destino en el mapa', destUrl),
+              ],
             ),
           ],
           const SizedBox(height: 17),

@@ -13,7 +13,10 @@ class GlobalBinding extends Bindings {
   void dependencies() {
     Get.put(SecureStorageService(), permanent: true);
     Get.put(ApiClient(), permanent: true);
-    Get.put(AuthService(Get.find<ApiClient>()), permanent: true);
+    Get.put(
+      AuthService(Get.find<ApiClient>(), Get.find<SecureStorageService>()),
+      permanent: true,
+    );
     Get.put(
       AuthController(
         authService: Get.find<AuthService>(),

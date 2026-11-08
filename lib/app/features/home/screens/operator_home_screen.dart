@@ -325,14 +325,14 @@ class _ActiveTripView extends StatelessWidget {
         // Ventana pre-tránsito sin acción manual posible: el viaje avanza
         // solo (GPS), el operador puede tocar la tarjeta para registrar
         // avances opcionales (reportado con cliente / rampa / cargando).
-        if (trip.isAccepted || trip.isPreTransitOptional)
+        if (trip.isAccepted || trip.isPreTransitOptional) ...[
           const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Text(
                 'Esperando que el viaje inicie movimiento.\n'
-                'Toca el viaje para registrar avances (reporte con cliente, '
-                'rampa, carga).',
+                'Usa Reportar… para registrar tu estatus (en espera de '
+                'acceso, en rampa, etc.).',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     color: AppColors.textMedium,
@@ -341,6 +341,24 @@ class _ActiveTripView extends StatelessWidget {
               ),
             ),
           ),
+          HomeActionCard(
+            icon: Icons.edit_note_rounded,
+            title: 'Reportar…',
+            subtitle: 'Estatus o problema',
+            iconColor: const Color(0xFFFFB74D),
+            onTap: () => Get.toNamed(RouteNames.reportHub),
+          ),
+        ],
+
+        if (trip.isAssigned) ...[
+          HomeActionCard(
+            icon: Icons.edit_note_rounded,
+            title: 'Reportar…',
+            subtitle: 'Estatus o problema',
+            iconColor: const Color(0xFFFFB74D),
+            onTap: () => Get.toNamed(RouteNames.reportHub),
+          ),
+        ],
 
         if (trip.isStarted) ...[
           const Text(
@@ -351,22 +369,17 @@ class _ActiveTripView extends StatelessWidget {
                 fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.95,
+          // Una tarjeta por fila, a todo el ancho.
+          Column(
             children: [
-              if (resp.canReportIncident)
-                HomeActionCard(
-                  icon: Icons.warning_amber_rounded,
-                  title: 'Reportar un problema',
-                  iconColor: const Color(0xFFFFB74D),
-                  onTap: () => Get.toNamed(RouteNames.reportIncident),
-                ),
-            ],
+              HomeActionCard(
+                icon: Icons.edit_note_rounded,
+                title: 'Reportar…',
+                subtitle: 'Estatus o problema',
+                iconColor: const Color(0xFFFFB74D),
+                onTap: () => Get.toNamed(RouteNames.reportHub),
+              ),
+            ].expand((w) => [w, const SizedBox(height: 12)]).toList(),
           ),
         ],
 
@@ -379,21 +392,16 @@ class _ActiveTripView extends StatelessWidget {
                 fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 0.95,
+          // Una tarjeta por fila, a todo el ancho.
+          Column(
             children: [
-              if (resp.canReportIncident)
-                HomeActionCard(
-                  icon: Icons.warning_amber_rounded,
-                  title: 'Reportar un problema',
-                  iconColor: const Color(0xFFFFB74D),
-                  onTap: () => Get.toNamed(RouteNames.reportIncident),
-                ),
+              HomeActionCard(
+                icon: Icons.edit_note_rounded,
+                title: 'Reportar…',
+                subtitle: 'Estatus o problema',
+                iconColor: const Color(0xFFFFB74D),
+                onTap: () => Get.toNamed(RouteNames.reportHub),
+              ),
               if (resp.canFinishTrip)
                 // if (authController.hasPermission('trip.update'))
                 HomeActionCard(
@@ -402,7 +410,7 @@ class _ActiveTripView extends StatelessWidget {
                   iconColor: const Color(0xFF81C784),
                   onTap: tc.goToChangeStatus,
                 ),
-            ],
+            ].expand((w) => [w, const SizedBox(height: 12)]).toList(),
           ),
         ],
 

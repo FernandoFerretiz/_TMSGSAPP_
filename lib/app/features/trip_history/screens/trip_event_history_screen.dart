@@ -25,8 +25,7 @@ class TripEventHistoryScreen extends StatefulWidget {
   const TripEventHistoryScreen({super.key});
 
   @override
-  State<TripEventHistoryScreen> createState() =>
-      _TripEventHistoryScreenState();
+  State<TripEventHistoryScreen> createState() => _TripEventHistoryScreenState();
 }
 
 class _TripEventHistoryScreenState extends State<TripEventHistoryScreen> {
@@ -68,7 +67,8 @@ class _TripEventHistoryScreenState extends State<TripEventHistoryScreen> {
     );
 
     if (changed == true) {
-      Get.snackbar('Operador actualizado', 'El viaje se reasignó al nuevo operador.');
+      Get.snackbar(
+          'Operador actualizado', 'El viaje se reasignó al nuevo operador.');
     }
   }
 
@@ -114,47 +114,51 @@ class _TripEventHistoryScreenState extends State<TripEventHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kSurfaceBg,
-      appBar: SxAppBar(title: const Text(
-          'Historial del viaje',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ), actions: [
-          Obx(() {
-            final link = _controller.tripHeader.value?.evidenceLink;
-            if (link == null || link.isEmpty) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.open_in_browser_rounded),
-              tooltip: 'Abrir link de evidencias',
-              onPressed: () => _openEvidenceLink(link),
-            );
-          }),
-          if (!Get.find<AuthController>().hasRole('operador'))
-            IconButton(
-              icon: const Icon(Icons.person_search_rounded),
-              tooltip: 'Cambiar operador',
-              onPressed: _openOperatorSheet,
-            ),
-          if (!Get.find<AuthController>().hasRole('operador'))
-            IconButton(
-              icon: const Icon(Icons.swap_horiz_rounded),
-              tooltip: 'Cambiar estatus',
-              onPressed: _openStatusSheet,
-            ),
-          Obx(() {
-            final status = _controller.tripHeader.value?.statusCode;
-            final canEdit = status != null && !['finished', 'cancelled'].contains(status);
-            if (!canEdit) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Editar viaje',
-              onPressed: () async {
-                final updated = await Get.toNamed(RouteNames.circuitTripForm, arguments: _tripId);
-                if (updated == true) {
-                  _controller.loadHistory(_tripId);
-                }
-              },
-            );
-          }),
-        ]),
+      appBar: SxAppBar(
+          title: const Text(
+            'Historial del viaje',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+          ),
+          actions: [
+            Obx(() {
+              final link = _controller.tripHeader.value?.evidenceLink;
+              if (link == null || link.isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.open_in_browser_rounded),
+                tooltip: 'Abrir link de evidencias',
+                onPressed: () => _openEvidenceLink(link),
+              );
+            }),
+            if (!Get.find<AuthController>().hasRole('operador'))
+              IconButton(
+                icon: const Icon(Icons.person_search_rounded),
+                tooltip: 'Cambiar operador',
+                onPressed: _openOperatorSheet,
+              ),
+            if (!Get.find<AuthController>().hasRole('operador'))
+              IconButton(
+                icon: const Icon(Icons.swap_horiz_rounded),
+                tooltip: 'Cambiar estatus',
+                onPressed: _openStatusSheet,
+              ),
+            Obx(() {
+              final status = _controller.tripHeader.value?.statusCode;
+              final canEdit =
+                  status != null && !['finished', 'cancelled'].contains(status);
+              if (!canEdit) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Editar viaje',
+                onPressed: () async {
+                  final updated = await Get.toNamed(RouteNames.circuitTripForm,
+                      arguments: _tripId);
+                  if (updated == true) {
+                    _controller.loadHistory(_tripId);
+                  }
+                },
+              );
+            }),
+          ]),
       body: Obx(() {
         if (_controller.isLoadingHistory.value) {
           return const Center(
@@ -172,16 +176,28 @@ class _TripEventHistoryScreenState extends State<TripEventHistoryScreen> {
         final trip = _controller.tripHeader.value;
         final events = _controller.events;
 
-        return Column(
-          children: [
-            if (trip != null) _TripHeaderCard(trip: trip),
-            if (trip != null)
-              Expanded(
-                child: events.isEmpty
-                    ? const _EmptyState()
-                    : _Timeline(events: events, trip: trip),
-              ),
-          ],
+        if (trip == null) return const SizedBox.shrink();
+
+        // Todo (tarjeta del viaje + línea de tiempo) vive en la misma lista
+        // desplazable para poder actualizar deslizando hacia abajo.
+        return RefreshIndicator(
+          color: AppColors.royalBlue,
+          onRefresh: () => _controller.loadHistory(_tripId, silent: true),
+          child: events.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    _TripHeaderCard(trip: trip, stages: _controller.stages),
+                    const SizedBox(height: 40),
+                    const _EmptyState(),
+                  ],
+                )
+              : _Timeline(
+                  events: events,
+                  trip: trip,
+                  header:
+                      _TripHeaderCard(trip: trip, stages: _controller.stages),
+                ),
         );
       }),
     );
@@ -190,7 +206,8 @@ class _TripEventHistoryScreenState extends State<TripEventHistoryScreen> {
 
 class _TripHeaderCard extends StatelessWidget {
   final TripSummary trip;
-  const _TripHeaderCard({required this.trip});
+  final Map<String, TripStage> stages;
+  const _TripHeaderCard({required this.trip, this.stages = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -272,29 +289,106 @@ class _TripHeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => SultanShareDialog.showTextOnly(
-                context,
-                text: tripDetailShareText(trip),
-              ),
-              icon: const Icon(Icons.share_rounded, size: 16),
-              label: const Text('Compartir detalle del viaje'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.royalBlue,
-                side: const BorderSide(color: AppColors.fieldBorder),
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                textStyle: const TextStyle(
-                    fontSize: 12.5, fontWeight: FontWeight.w700),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          // El operador no comparte el detalle del viaje.
+          if (!Get.find<AuthController>().hasRole('operador')) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => SultanShareDialog.showTextOnly(
+                  context,
+                  text: tripDetailShareText(trip),
+                ),
+                icon: const Icon(Icons.share_rounded, size: 16),
+                label: const Text('Compartir detalle del viaje'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.royalBlue,
+                  side: const BorderSide(color: AppColors.fieldBorder),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  textStyle: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w700),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
+          ],
+          const SizedBox(height: 16),
+          const SizedBox(
+            width: double.infinity,
+            child: Text(
+              'Evidencias:',
+              style: TextStyle(
+                color: AppColors.textDark,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (final key in const ['start', 'end']) ...[
+                Expanded(
+                  child: _StageButton(
+                    icon: key == 'start'
+                        ? Icons.flag_rounded
+                        : Icons.check_circle_rounded,
+                    label: key == 'start' ? 'Inicio' : 'Finalización',
+                    count: stages[key]?.totalFiles ?? 0,
+                    onTap: () {
+                      final stage = stages[key];
+                      if (stage == null) return;
+                      TripEventDetailSheet.show(
+                        context,
+                        trip: trip,
+                        event: stage.toEvent(),
+                        stageView: true,
+                      );
+                    },
+                  ),
+                ),
+                if (key == 'start') const SizedBox(width: 10),
+              ],
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Botón de etapa ("Inicio" / "Finalización") de la tarjeta del viaje: abre
+/// la hoja con las evidencias y documentos de esa etapa.
+class _StageButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final VoidCallback onTap;
+  const _StageButton({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton.icon(
+      // Sin evidencia ni documentos de la etapa: deshabilitado.
+      onPressed: count > 0 ? onTap : null,
+      icon: Icon(icon, size: 16),
+      label: Text(count > 0 ? '$label ($count)' : label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.royalBlue,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: AppColors.fieldBorder,
+        disabledForegroundColor: AppColors.textLight,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -312,15 +406,24 @@ String _shareMessageFor(TripSummary trip, {String? evidenceLabel}) {
   return buffer.toString();
 }
 
-
 class _Timeline extends StatelessWidget {
   final List<TripEvent> events;
   final TripSummary? trip;
-  const _Timeline({required this.events, required this.trip});
+  // Tarjeta del viaje: va como primer elemento de la lista.
+  final Widget? header;
+  const _Timeline({required this.events, required this.trip, this.header});
 
   Map<String, List<TripEvent>> _groupByDate() {
+    // Más reciente primero: el usuario siempre ve el último estatus arriba.
+    final newestFirst = [...events]..sort((a, b) {
+        final ta = a.timestamp, tb = b.timestamp;
+        if (ta == null && tb == null) return 0;
+        if (ta == null) return 1;
+        if (tb == null) return -1;
+        return tb.compareTo(ta);
+      });
     final groups = <String, List<TripEvent>>{};
-    for (final event in events) {
+    for (final event in newestFirst) {
       final key = event.timestamp != null
           ? DateFormat('yyyy-MM-dd').format(event.timestamp!)
           : 'sin_fecha';
@@ -334,53 +437,60 @@ class _Timeline extends StatelessWidget {
     final groups = _groupByDate();
     final dateKeys = groups.keys.toList();
 
+    final offset = header != null ? 1 : 0;
+
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      itemCount: dateKeys.length,
-      itemBuilder: (context, groupIndex) {
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: dateKeys.length + offset,
+      itemBuilder: (context, index) {
+        if (header != null && index == 0) return header!;
+        final groupIndex = index - offset;
         final key = dateKeys[groupIndex];
         final groupEvents = groups[key]!;
         final label = key == 'sin_fecha'
             ? 'Sin fecha'
             : DateFormat("d 'de' MMMM").format(DateTime.parse(key));
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12, top: 6, left: 2),
-              child: Row(
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
+        return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12, top: 6, left: 2),
+                  child: Row(
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.textDark,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          height: 1,
+                          color: const Color(0xFFE4E7F0),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      height: 1,
-                      color: const Color(0xFFE4E7F0),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ...List.generate(groupEvents.length, (i) {
-              final isLast = groupIndex == dateKeys.length - 1 &&
-                  i == groupEvents.length - 1;
-              return _TimelineItem(
-                event: groupEvents[i],
-                showLine: !isLast,
-                trip: trip,
-              );
-            }),
-          ],
-        );
+                ),
+                ...List.generate(groupEvents.length, (i) {
+                  final isLast = groupIndex == dateKeys.length - 1 &&
+                      i == groupEvents.length - 1;
+                  return _TimelineItem(
+                    event: groupEvents[i],
+                    showLine: !isLast,
+                    trip: trip,
+                  );
+                }),
+              ],
+            ));
       },
     );
   }
@@ -400,12 +510,14 @@ class _TimelineItem extends StatelessWidget {
         TripEventType.incident => const Color(0xFFDC2626),
         TripEventType.stop => const Color(0xFFD97706),
         TripEventType.status => const Color(0xFF2563EB),
+        TripEventType.log => const Color(0xFF0D9488),
       };
 
   IconData get _icon => switch (event.type) {
         TripEventType.incident => Icons.warning_amber_rounded,
         TripEventType.stop => Icons.pause_circle_outline_rounded,
         TripEventType.status => Icons.swap_horiz_rounded,
+        TripEventType.log => Icons.edit_note_rounded,
       };
 
   @override
@@ -443,83 +555,91 @@ class _TimelineItem extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: trip == null
-                    ? null
-                    : () => TripEventDetailSheet.show(
-                          context,
-                          trip: trip!,
-                          event: event,
-                        ),
-                child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        color: AppColors.textDark,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (event.subtitle != null &&
-                        event.subtitle!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        event.subtitle!,
-                        style: const TextStyle(
-                          color: AppColors.textMedium,
-                          fontSize: 13,
+                  onTap: trip == null
+                      ? null
+                      : () => TripEventDetailSheet.show(
+                            context,
+                            trip: trip!,
+                            event: event,
+                          ),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (event.actorName != null &&
-                            event.actorName!.trim().isNotEmpty) ...[
-                          const Icon(Icons.person_outline_rounded,
-                              size: 13, color: AppColors.textLight),
-                          const SizedBox(width: 4),
-                          Text(
-                            event.actorName!,
-                            style: const TextStyle(
-                              color: AppColors.textLight,
-                              fontSize: 11.5,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                        ],
-                        if (event.timestamp != null) ...[
-                          const Icon(Icons.access_time_rounded,
-                              size: 13, color: AppColors.textLight),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('HH:mm').format(event.timestamp!),
-                            style: const TextStyle(
-                              color: AppColors.textLight,
-                              fontSize: 11.5,
-                            ),
-                          ),
-                        ],
                       ],
                     ),
-                    ],
-                ),
-                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.title,
+                          style: const TextStyle(
+                            color: AppColors.textDark,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (event.subtitle != null &&
+                            event.subtitle!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            event.subtitle!,
+                            style: const TextStyle(
+                              color: AppColors.textMedium,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                        if (event.attentionLabel != null) ...[
+                          const SizedBox(height: 8),
+                          _AttentionChip(
+                            status: event.attentionStatus,
+                            label: event.attentionLabel!,
+                            by: event.attentionBy,
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            if (event.actorName != null &&
+                                event.actorName!.trim().isNotEmpty) ...[
+                              const Icon(Icons.person_outline_rounded,
+                                  size: 13, color: AppColors.textLight),
+                              const SizedBox(width: 4),
+                              Text(
+                                event.actorName!,
+                                style: const TextStyle(
+                                  color: AppColors.textLight,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            if (event.timestamp != null) ...[
+                              const Icon(Icons.access_time_rounded,
+                                  size: 13, color: AppColors.textLight),
+                              const SizedBox(width: 4),
+                              Text(
+                                DateFormat('HH:mm').format(event.timestamp!),
+                                style: const TextStyle(
+                                  color: AppColors.textLight,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -606,7 +726,6 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-
 /// Selector de estatus (cualquiera, sin restricción de flujo) con
 /// comentario opcional. Cierra con true si el cambio se guardó.
 class _StatusChangeSheet extends StatefulWidget {
@@ -638,7 +757,8 @@ class _StatusChangeSheetState extends State<_StatusChangeSheet> {
       _error = null;
     });
     final comments = _commentsCtrl.text.trim();
-    final error = await widget.onSubmit(_selectedId!, comments.isEmpty ? null : comments);
+    final error =
+        await widget.onSubmit(_selectedId!, comments.isEmpty ? null : comments);
     if (!mounted) return;
     if (error == null) {
       Navigator.of(context).pop(true);
@@ -664,7 +784,8 @@ class _StatusChangeSheetState extends State<_StatusChangeSheet> {
             const Text('Cambiar estatus',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            const Text('Puedes elegir cualquier estatus, sin seguir el flujo normal.',
+            const Text(
+                'Puedes elegir cualquier estatus, sin seguir el flujo normal.',
                 style: TextStyle(fontSize: 12, color: Colors.black54)),
             const SizedBox(height: 12),
             for (final s in widget.catalog.statuses)
@@ -694,7 +815,8 @@ class _StatusChangeSheetState extends State<_StatusChangeSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              Text(_error!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12)),
             ],
             const SizedBox(height: 14),
             SizedBox(
@@ -781,7 +903,8 @@ class _OperatorChangeSheetState extends State<_OperatorChangeSheet> {
                   'El viaje y su caja pasan al operador elegido. El nuevo '
                   'operador debe tener el rastreo activo; el anterior queda '
                   'libre para detener el suyo.',
-                  style: TextStyle(color: AppColors.textMedium, fontSize: 12.5)),
+                  style:
+                      TextStyle(color: AppColors.textMedium, fontSize: 12.5)),
               const SizedBox(height: 12),
               Flexible(
                 child: ListView(
@@ -795,12 +918,12 @@ class _OperatorChangeSheetState extends State<_OperatorChangeSheet> {
                           _selectedId == o.id
                               ? Icons.radio_button_checked
                               : Icons.radio_button_unchecked,
-                          color: _selectedId == o.id
-                              ? AppColors.royalBlue
-                              : null,
+                          color:
+                              _selectedId == o.id ? AppColors.royalBlue : null,
                         ),
                         title: Text(o.name,
-                            style: const TextStyle(fontWeight: FontWeight.w700)),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
                         subtitle: Text(
                           o.id == current
                               ? 'Operador actual'
@@ -855,6 +978,54 @@ class _OperatorChangeSheetState extends State<_OperatorChangeSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Estado de atención de un problema de la bitácora (alerta pendiente / en
+/// atención / resuelta) y quién la atiende.
+class _AttentionChip extends StatelessWidget {
+  final String? status;
+  final String label;
+  final String? by;
+  const _AttentionChip({required this.status, required this.label, this.by});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      'resolved' => const Color(0xFF16A34A),
+      'in_attention' => const Color(0xFF1565C0),
+      _ => const Color(0xFFDC2626),
+    };
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+          ),
+        ),
+        if (by != null && by!.trim().isNotEmpty) ...[
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              by!,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: AppColors.textMedium,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

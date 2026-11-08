@@ -75,6 +75,11 @@ String genericStatusShareText(TripSummary trip, TripEvent event) {
 /// Detalle general del viaje (no de un evento puntual) — botón "Compartir
 /// detalle del viaje" en el encabezado del historial.
 String tripDetailShareText(TripSummary trip) {
+  // El texto lo arma el backend (config/mobile.php: trip_share_template);
+  // lo de abajo es solo respaldo si el servidor aún no lo envía.
+  final serverText = trip.shareText;
+  if (serverText != null && serverText.trim().isNotEmpty) return serverText;
+
   final materials = trip.additionalMaterials.isEmpty
       ? _dash
       : trip.additionalMaterials.join(', ');

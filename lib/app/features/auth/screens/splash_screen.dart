@@ -1,9 +1,11 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/config/app_config.dart';
 import '../controllers/auth_controller.dart';
+import '../data/auth_service.dart';
 
 /// AuthGate: shown on cold start.
 /// Animates in, then delegates auth check to AuthController,
@@ -35,9 +37,39 @@ class _SplashScreenState extends State<SplashScreen>
     _anim.forward();
 
     // Give the animation time to play before checking auth.
-    Future.delayed(const Duration(milliseconds: 1800), () {
+    Future.delayed(const Duration(milliseconds: 1800), () async {
+      await _confirmEnvironmentNotice();
       Get.find<AuthController>().checkAuthStatus();
     });
+  }
+
+  /// The server decides (and words) the notice shown when this build points to
+  /// a non-production environment, e.g. when the base URL was left wrong.
+  Future<void> _confirmEnvironmentNotice() async {
+    final notice = await Get.find<AuthService>().getEnvironmentNotice();
+    if (notice == null || !mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text(notice['title']?.toString() ?? ''),
+          content: Text(notice['message']?.toString() ?? ''),
+          actions: [
+            TextButton(
+              onPressed: SystemNavigator.pop,
+              child: Text(notice['exit_label']?.toString() ?? 'Salir'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(notice['continue_label']?.toString() ?? 'Continuar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

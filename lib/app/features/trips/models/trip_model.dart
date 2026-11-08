@@ -74,6 +74,9 @@ class TripModel {
   final String truckboxNum;
   final String origin;
   final String destination;
+  final double? originLatitude;
+  final double? originLongitude;
+  final String? originMapsUrl;
   final double? destinationLatitude;
   final double? destinationLongitude;
   final String? destinationMapsUrl;
@@ -100,6 +103,9 @@ class TripModel {
     required this.truckboxNum,
     required this.origin,
     required this.destination,
+    this.originLatitude,
+    this.originLongitude,
+    this.originMapsUrl,
     this.destinationLatitude,
     this.destinationLongitude,
     this.destinationMapsUrl,
@@ -155,6 +161,9 @@ class TripModel {
         truckboxNum: (json['truckbox_num'] ?? '').toString(),
         origin: (json['origin'] ?? '').toString(),
         destination: (json['destination'] ?? '').toString(),
+        originLatitude: (json['origin_latitude'] as num?)?.toDouble(),
+        originLongitude: (json['origin_longitude'] as num?)?.toDouble(),
+        originMapsUrl: json['origin_maps_url']?.toString(),
         destinationLatitude: (json['destination_latitude'] as num?)?.toDouble(),
         destinationLongitude: (json['destination_longitude'] as num?)?.toDouble(),
         destinationMapsUrl: json['destination_maps_url']?.toString(),

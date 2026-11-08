@@ -7,6 +7,7 @@ import '../../../core/config/app_config.dart';
 import '../../auth/widgets/gradient_button.dart';
 import '../controllers/circuit_trip_form_controller.dart';
 import '../models/circuit_trip_models.dart';
+import '../widgets/truckbox_registration_flow.dart';
 
 /// Formulario de alta de viajes de circuito — reemplazo (no conversacional)
 /// del flujo equivalente del chatbot: mismos pasos, mismas reglas, resueltos
@@ -19,99 +20,202 @@ class CircuitTripFormScreen extends StatelessWidget {
     final c = Get.find<CircuitTripFormController>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      appBar: SxAppBar(title: Obx(() => Text(
-              c.isEditing ? 'Editar viaje #${c.editingTripId.value}' : 'Nuevo viaje de circuito',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-            ))),
+      backgroundColor: Sx.pageBg,
+      appBar: SxAppBar(
+          title: Obx(() => Text(
+                c.isEditing
+                    ? 'Editar viaje #${c.editingTripId.value}'
+                    : (c.selectedCircuit.value?.routeTypeName?.trim().isNotEmpty ?? false)
+                        ? c.selectedCircuit.value!.routeTypeName!.trim()
+                        : 'Nuevo viaje de circuito',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+              ))),
       body: Obx(() => c.isLoadingForEdit.value
           ? const Center(child: CircularProgressIndicator())
           : c.editLoadFailed.value
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ErrorBanner(c.errorMessage.value),
-                    const SizedBox(height: 14),
-                    TextButton(
-                      onPressed: () => c.loadForEdit(c.editingTripId.value!),
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ClientStep(c: c),
-            Obx(() => c.selectedClient.value == null
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: _CircuitStep(c: c),
-                  )),
-            Obx(() => c.selectedCircuit.value == null
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: _OperatorStep(c: c),
-                  )),
-            Obx(() => c.legResolution.value == null
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: _OriginDestinationStep(c: c),
-                  )),
-            Obx(() => (c.legResolution.value == null || !c.originDestinationReady)
-                ? const SizedBox.shrink()
-                : Padding(
-                    padding: const EdgeInsets.only(top: 14),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        _AppointmentStep(c: c),
-                        if (c.isOutbound) ...[
-                          const SizedBox(height: 14),
-                          _TypeTripStep(c: c),
-                        ],
+                        _ErrorBanner(c.errorMessage.value),
                         const SizedBox(height: 14),
-                        _CommentsStep(c: c),
-                        const SizedBox(height: 14),
-                        _InternalInfoStep(c: c),
-                        const SizedBox(height: 14),
-                        _TruckboxStep(c: c),
-                        const SizedBox(height: 14),
-                        _AdditionalMaterialsStep(c: c),
-                        const SizedBox(height: 22),
-                        Obx(() => c.errorMessage.value.isEmpty
-                            ? const SizedBox.shrink()
-                            : Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: _ErrorBanner(c.errorMessage.value),
-                              )),
-                        Obx(() => GradientButton(
-                              label: c.isEditing ? 'Guardar cambios' : 'Registrar asignación',
-                              isLoading: c.isSubmitting.value,
-                              onPressed: c.canSubmit
-                                  ? () => _handleSubmit(context, c)
-                                  : null,
-                            )),
-                        const SizedBox(height: 20),
+                        TextButton(
+                          onPressed: () => c.loadForEdit(c.editingTripId.value!),
+                          child: const Text('Reintentar'),
+                        ),
                       ],
                     ),
-                  )),
-          ],
-        ),
-      )),
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ClientStep(c: c),
+                      Obx(() => c.selectedClient.value == null
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: _CircuitStep(c: c),
+                            )),
+                      Obx(() => c.selectedCircuit.value == null
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: _OperatorStep(c: c),
+                            )),
+                      Obx(() => c.legResolution.value == null
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: c.isRouteMode
+                                  ? Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _AppointmentStep(c: c),
+                                        const SizedBox(height: 14),
+                                        _RouteTimeline(c: c),
+                                      ],
+                                    )
+                                  : Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Vuelta del circuito: debajo del operador y arriba del origen.
+                                        if (c.isReturn &&
+                                            !c.isEditing &&
+                                            (c.legResolution.value?.movements ?? const <RoundMovement>[])
+                                                .isNotEmpty) ...[
+                                          _RoundHistory(
+                                              c: c, movements: c.legResolution.value!.movements),
+                                          const SizedBox(height: 14),
+                                        ],
+                                        _OriginDestinationStep(c: c),
+                                      ],
+                                    ),
+                            )),
+                      Obx(() => (c.legResolution.value == null || !c.originDestinationReady)
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (!c.isRouteMode) ...[
+                                    _AppointmentStep(c: c),
+                                    const SizedBox(height: 14),
+                                  ],
+                                  if (c.isOutbound && c.isEditing) ...[
+                                    _TypeTripStep(c: c),
+                                    const SizedBox(height: 14),
+                                  ] else if (c.isRouteMode) ...[
+                                    _CreateAllStep(c: c),
+                                    const SizedBox(height: 14),
+                                  ] else ...[
+                                    _NextMovementStepOrNothing(c: c),
+                                  ],
+                                  if (c.canAddEditStops) ...[
+                                    _EditExtraStops(c: c),
+                                    const SizedBox(height: 14),
+                                  ],
+                                  _CommentsStep(c: c),
+                                  if (!c.isRouteMode) ...[
+                                    const SizedBox(height: 14),
+                                    _InternalInfoStep(c: c),
+                                    const SizedBox(height: 14),
+                                    _TruckboxStep(c: c),
+                                  ],
+                                  const SizedBox(height: 14),
+                                  _AdditionalMaterialsStep(c: c),
+                                  const SizedBox(height: 22),
+                                  Obx(() => c.errorMessage.value.isEmpty
+                                      ? const SizedBox.shrink()
+                                      : Padding(
+                                          padding: const EdgeInsets.only(bottom: 14),
+                                          child: _ErrorBanner(c.errorMessage.value),
+                                        )),
+                                  Obx(() => GradientButton(
+                                        label: c.isEditing
+                                            ? 'Guardar cambios'
+                                            : (c.isRouteMode
+                                                ? 'Registrar asignación (${c.tripsToCreate} viaje${c.tripsToCreate == 1 ? '' : 's'})'
+                                                : 'Registrar asignación'),
+                                        isLoading: c.isSubmitting.value,
+                                        onPressed:
+                                            c.canSubmit ? () => _handleSubmit(context, c) : null,
+                                      )),
+                                  Obx(() {
+                                    final missing = c.missingItems;
+                                    if (c.canSubmit || missing.isEmpty) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 10),
+                                      child: Text(
+                                        'Falta: ${missing.join(', ')}.',
+                                        style: const TextStyle(
+                                            color: AppColors.textMedium, fontSize: 12.5),
+                                      ),
+                                    );
+                                  }),
+                                  if (c.isEditing && c.editCanRemove.value) ...[
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        final removed = await _confirmRemoveMovement(
+                                            context, c, c.editingTripId.value!, 0);
+                                        if (removed) Get.back(result: true);
+                                      },
+                                      icon: const Icon(Icons.delete_outline, size: 18),
+                                      label: const Text('Eliminar movimiento'),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size.fromHeight(48),
+                                        foregroundColor: Colors.red.shade700,
+                                        side: BorderSide(color: Colors.red.shade200),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(14)),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 20),
+                                ],
+                              ),
+                            )),
+                    ],
+                  ),
+                )),
     );
   }
 
   Future<void> _handleSubmit(BuildContext context, CircuitTripFormController c) async {
+    // Cajas escritas que no están registradas: confirmar y registrarlas antes de crear el viaje.
+    if (!await TruckboxRegistrationFlow.run(context, c)) return;
+
+    // Sin link de evidencias válido: advertir; si continúa, el servidor lo deja como pendiente.
+    if (c.hasMissingEvidenceLink) {
+      if (!context.mounted) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Link de evidencias pendiente'),
+          content: const Text(
+              'No se registró el link de evidencias de al menos un viaje, o no es un link válido. '
+              'Si continúas, quedará pendiente y se te pedirá al finalizar el turno.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Volver')),
+            FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Continuar')),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
     final result = await c.submit();
     if (result == null) return;
 
@@ -136,8 +240,45 @@ class CircuitTripFormScreen extends StatelessWidget {
       backgroundColor: AppColors.royalBlue,
       colorText: Colors.white,
     );
+    if (c.openedFromRound) {
+      Get.back(result: true);
+      return;
+    }
     c.resetAll();
   }
+}
+
+/// Confirma y elimina un movimiento ya registrado. El siguiente movimiento pasa
+/// a salir del destino del anterior. Devuelve true si se eliminó.
+Future<bool> _confirmRemoveMovement(
+    BuildContext context, CircuitTripFormController c, int tripId, int position) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Eliminar movimiento'),
+      content: Text(
+        'Se eliminará ${position > 0 ? 'el movimiento $position' : 'este movimiento'}. El siguiente movimiento (si lo hay) pasará a salir del destino del anterior.',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+          child: const Text('Eliminar'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return false;
+
+  final removed = await c.removeMovement(tripId);
+  Get.snackbar(
+    removed ? 'Movimiento eliminado' : 'No se pudo eliminar',
+    removed ? 'La vuelta se actualizó.' : c.errorMessage.value,
+    backgroundColor: removed ? AppColors.royalBlue : Colors.red.shade700,
+    colorText: Colors.white,
+  );
+  return removed;
 }
 
 // ── Steps ─────────────────────────────────────────────────────────────────
@@ -213,7 +354,8 @@ class _OperatorStep extends StatelessWidget {
               value: c.selectedOperator.value,
               hint: 'Selecciona el operador',
               items: c.operators,
-              itemLabel: (o) => '${o.name}${o.transporterName != null ? ' (${o.transporterName})' : ''}',
+              itemLabel: (o) =>
+                  '${o.name}${o.transporterName != null ? ' (${o.transporterName})' : ''}',
               onChanged: c.selectOperator,
             );
           }),
@@ -233,8 +375,8 @@ class _OperatorStep extends StatelessWidget {
                 c.isEditing
                     ? (leg.isReturn ? 'Tramo: Regreso' : 'Tramo: Ida')
                     : leg.isReturn
-                    ? 'Se registrará el REGRESO de una vuelta abierta.'
-                    : 'Se registrará la IDA de una nueva vuelta.',
+                        ? 'Se registrará el REGRESO de una vuelta abierta.'
+                        : 'Se registrará la IDA de una nueva vuelta.',
               ),
             );
           }),
@@ -255,19 +397,31 @@ class _OriginDestinationStep extends StatelessWidget {
 
       if (leg.isReturn) {
         return _StepCard(
-          title: 'Origen del regreso',
+          title: c.isEditing ? 'Origen del movimiento' : 'Origen del siguiente movimiento',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _InfoChip('Destino fijo: ${leg.destination?.name ?? '—'}'),
+              if (leg.nextOrigin == null || c.isEditing) ...[
+                _InfoChip('Destino fijo: ${leg.destination?.name ?? '—'}'),
+                const SizedBox(height: 10),
+              ] else
+                _InfoChip(
+                    'Sugerido: ${leg.nextOrigin!.name} (donde terminó el movimiento anterior). '
+                    'Cámbialo si la caja se cargó en otro lugar.'),
               const SizedBox(height: 10),
               _Dropdown<AddressOption>(
-                value: c.selectedReturnOrigin.value,
-                hint: 'Selecciona el origen',
-                items: leg.returnOriginOptions,
-                itemLabel: (o) => o.name,
-                onChanged: c.selectReturnOrigin,
-              ),
+                  value: c.selectedReturnOrigin.value,
+                  hint: 'Selecciona el origen',
+                  // El último destino siempre es opción, aunque no esté en el catálogo.
+                  items: [
+                    ...leg.returnOriginOptions,
+                    if (leg.nextOrigin != null &&
+                        !leg.returnOriginOptions.contains(leg.nextOrigin))
+                      leg.nextOrigin!,
+                  ],
+                  itemLabel: (o) => o.name,
+                  onChanged: c.selectReturnOrigin,
+                ),
               Obx(() => c.isLoadingReturnRouteType.value
                   ? const Padding(
                       padding: EdgeInsets.only(top: 8),
@@ -290,9 +444,8 @@ class _OriginDestinationStep extends StatelessWidget {
               if (c.isLoadingDestinations.value) return const _InlineLoader();
               return _Dropdown<AddressOption>(
                 value: c.selectedDestination.value,
-                hint: c.destinationPending.value
-                    ? 'Pendiente por asignar'
-                    : 'Selecciona el destino',
+                hint:
+                    c.destinationPending.value ? 'Pendiente por asignar' : 'Selecciona el destino',
                 items: c.destinationOptions,
                 itemLabel: (o) => o.name,
                 onChanged: c.selectDestination,
@@ -341,8 +494,7 @@ class _AppointmentStep extends StatelessWidget {
     );
     if (time == null) return;
 
-    c.appointmentDateTime.value =
-        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    c.appointmentDateTime.value = DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
   @override
@@ -415,6 +567,792 @@ class _TypeTripStep extends StatelessWidget {
   }
 }
 
+/// Ruta del alta como línea de tiempo (igual que el mockup): origen fijo →
+/// destino de la ida → intermedios → fin. Cada movimiento lleva su propia
+/// tarjeta con tipo de viaje, caja y la información interna de ese viaje.
+class _RouteTimeline extends StatelessWidget {
+  final CircuitTripFormController c;
+  const _RouteTimeline({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return _StepCard(
+      title: 'Ruta del circuito',
+      child: Obx(() {
+        final leg = c.legResolution.value!;
+        final origin = leg.origin?.name ?? '—';
+        final pending = c.destinationPending.value;
+        final hasDestination = c.selectedDestination.value != null || pending;
+        final hasStops = c.stops.isNotEmpty && !pending;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Por defecto solo hay un movimiento (la ida). Cada movimiento que agregues sale del destino del anterior y el último es el fin.',
+              style: TextStyle(color: AppColors.textMedium, fontSize: 12.5),
+            ),
+            const SizedBox(height: 12),
+            _TimelineNode(
+              kind: _DotKind.start,
+              title: 'Origen',
+              tag: 'Fijo',
+              child: _InfoChip(origin),
+            ),
+            _TimelineNode(
+              kind: _DotKind.middle,
+              title: 'Destino de la ida',
+              tag: 'Ida',
+              isLast: !hasDestination,
+              child: _IdaDestination(c: c),
+            ),
+            if (hasDestination)
+              _LegCard(
+                position: 1,
+                label: 'Ida',
+                from: origin,
+                to: pending ? 'Pendiente por asignar' : (c.selectedDestination.value?.name ?? '¿?'),
+                isLast: !hasStops,
+                typeTrip: c.typeTrip,
+                truckbox: _TruckboxFields(
+                  isPt: c.truckboxIsPt,
+                  number: c.truckboxNumber,
+                  owner: c.truckboxOwner,
+                  usesOwnTruckboxes: c.usesOwnTruckboxes,
+                ),
+                internalLink: c.internalLink,
+                internalNotes: c.internalNotes,
+              ),
+            if (pending)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Text(
+                  'Define el destino de la ida para poder agregar más movimientos. Por ahora solo se creará la ida.',
+                  style: TextStyle(color: AppColors.textMedium, fontSize: 12.5),
+                ),
+              ),
+            if (hasDestination && !pending) ...[
+              for (var i = 0; i < c.stops.length; i++) _StopNode(c: c, index: i),
+              const SizedBox(height: 4),
+              OutlinedButton.icon(
+                onPressed: c.addStop,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Agregar movimiento'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  foregroundColor: AppColors.royalBlue,
+                  side: const BorderSide(color: AppColors.lightBlue, width: 2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+          ],
+        );
+      }),
+    );
+  }
+}
+
+enum _DotKind { start, middle, end }
+
+/// Un punto de la línea de tiempo: círculo + línea hacia el siguiente + contenido.
+class _TimelineNode extends StatelessWidget {
+  final _DotKind kind;
+  final String? title;
+  final String? tag;
+  final Widget? actions;
+  final Widget child;
+  final bool isLast;
+
+  const _TimelineNode({
+    super.key,
+    required this.kind,
+    this.title,
+    this.tag,
+    this.actions,
+    required this.child,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = kind != _DotKind.middle;
+    final color = kind == _DotKind.end ? AppColors.navyBlue : AppColors.royalBlue;
+
+    return Stack(
+      children: [
+        // Línea hacia el siguiente punto (detrás del contenido, sin medir alturas).
+        if (!isLast && kind != _DotKind.end)
+          Positioned(
+            left: 11.5,
+            top: 22,
+            bottom: 0,
+            width: 3,
+            child: Container(color: AppColors.lightBlue),
+          ),
+        Positioned(
+          left: 0,
+          top: 0,
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: filled ? color : Colors.white,
+              border: Border.all(color: color, width: 4),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 38, bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(title!,
+                            style: const TextStyle(
+                                color: AppColors.navyBlue,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                      if (tag != null) _Tag(tag!),
+                      if (actions != null) actions!,
+                    ],
+                  ),
+                ),
+              child,
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+  const _Tag(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.lightBlue.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(text.toUpperCase(),
+          style: const TextStyle(
+              color: AppColors.royalBlue,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3)),
+    );
+  }
+}
+
+/// Destino de la ida + "Pendiente por asignar".
+class _IdaDestination extends StatelessWidget {
+  final CircuitTripFormController c;
+  const _IdaDestination({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (c.isLoadingDestinations.value)
+              const _InlineLoader()
+            else
+              _Dropdown<AddressOption>(
+                value: c.selectedDestination.value,
+                hint:
+                    c.destinationPending.value ? 'Pendiente por asignar' : 'Selecciona el destino',
+                items: c.destinationOptions,
+                itemLabel: (o) => o.name,
+                onChanged: c.selectDestination,
+              ),
+            CheckboxListTile(
+              value: c.destinationPending.value,
+              onChanged: (v) {
+                if (v == true) {
+                  c.selectDestinationPending();
+                } else {
+                  c.selectDestination(null);
+                }
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Pendiente por asignar',
+                  style: TextStyle(fontSize: 13, color: AppColors.textMedium)),
+            ),
+          ],
+        ));
+  }
+}
+
+/// Tarjeta de un movimiento (debajo de su punto): tipo de viaje, caja e
+/// información interna de ese viaje.
+class _LegCard extends StatelessWidget {
+  final int position;
+  final String label;
+  final String from;
+  final String to;
+  final bool isLast;
+  final Rxn<String> typeTrip;
+  final Widget truckbox;
+  final RxString internalLink;
+  final RxString internalNotes;
+
+  const _LegCard({
+    required this.position,
+    required this.label,
+    required this.from,
+    required this.to,
+    required this.isLast,
+    required this.typeTrip,
+    required this.truckbox,
+    required this.internalLink,
+    required this.internalNotes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _TimelineNode(
+      kind: _DotKind.middle,
+      isLast: isLast,
+      child: _DashedBox(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$position · $label · $from → $to',
+                style: const TextStyle(
+                    color: AppColors.navyBlue, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            Obx(() => _TypeChips(value: typeTrip.value, onChanged: (v) => typeTrip.value = v)),
+            const SizedBox(height: 10),
+            const Text('Caja',
+                style: TextStyle(
+                    color: AppColors.navyBlue, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            truckbox,
+            const SizedBox(height: 4),
+            _InternalFields(link: internalLink, notes: internalNotes),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StopNode extends StatelessWidget {
+  final CircuitTripFormController c;
+  final int index;
+  const _StopNode({required this.c, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final stop = c.stops[index];
+
+    return Obx(() {
+      final isLast = index == c.stops.length - 1;
+
+      return _TimelineNode(
+        key: ObjectKey(stop),
+        kind: isLast ? _DotKind.end : _DotKind.middle,
+        title: 'Movimiento ${index + 2}',
+        tag: isLast ? 'Fin' : null,
+        actions: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _MiniIcon(Icons.arrow_upward, index == 0 ? null : () => c.moveStop(index, -1)),
+            _MiniIcon(Icons.arrow_downward, isLast ? null : () => c.moveStop(index, 1)),
+            _MiniIcon(Icons.close, () => c.removeStop(index), danger: true),
+          ],
+        ),
+        child: _DashedBox(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Sale de',
+                  style: TextStyle(
+                      color: AppColors.textMedium, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              _Dropdown<AddressOption>(
+                value: c.stopOrigin(index),
+                hint: 'Elige el origen',
+                items: c.stopOriginOptions(index),
+                itemLabel: (o) => o.name,
+                onChanged: (a) => c.selectStopOrigin(index, a),
+              ),
+              const SizedBox(height: 10),
+              const Text('Llega a',
+                  style: TextStyle(
+                      color: AppColors.textMedium, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              _Dropdown<AddressOption>(
+                value: stop.destination.value,
+                hint: 'Elige el destino',
+                items: c.stopOptions(index),
+                itemLabel: (o) => o.name,
+                onChanged: (a) => c.selectStopDestination(stop, a),
+              ),
+              const SizedBox(height: 12),
+              _TypeChips(value: stop.typeTrip.value, onChanged: (v) => stop.typeTrip.value = v),
+              const SizedBox(height: 10),
+              _MovementBox(
+                same: stop.sameTruckbox,
+                isPt: stop.truckboxIsPt,
+                number: stop.truckboxNumber,
+                owner: stop.truckboxOwner,
+                usesOwnTruckboxes: c.usesOwnTruckboxes,
+              ),
+              const SizedBox(height: 4),
+              _InternalFields(link: stop.internalLink, notes: stop.internalNotes),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _MiniIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool danger;
+  const _MiniIcon(this.icon, this.onTap, {this.danger = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 30,
+        height: 30,
+        margin: const EdgeInsets.only(left: 4),
+        decoration: BoxDecoration(
+          color: AppColors.fieldFill,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon,
+            size: 15,
+            color: onTap == null
+                ? AppColors.textLight.withValues(alpha: 0.5)
+                : (danger ? Colors.red.shade700 : AppColors.textMedium)),
+      ),
+    );
+  }
+}
+
+/// Tarjeta con borde punteado (como en el mockup) para cada movimiento.
+class _DashedBox extends StatelessWidget {
+  final Widget child;
+  const _DashedBox({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.fieldFill,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.lightBlue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(14)));
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 6), paint);
+        distance += 10;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// "¿Crear todos los movimientos ahora?" + resumen de lo que se creará.
+class _CreateAllStep extends StatelessWidget {
+  final CircuitTripFormController c;
+  const _CreateAllStep({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final total = c.routeMovementCount;
+      final created = c.tripsToCreate;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.navyBlue,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Text.rich(
+              TextSpan(
+                style: const TextStyle(color: Colors.white, fontSize: 13.5, height: 1.45),
+                children: [
+                  const TextSpan(
+                      text: 'Ruta: ',
+                      style: TextStyle(color: AppColors.lightBlue, fontWeight: FontWeight.w700)),
+                  TextSpan(text: '${c.routeSummary}\n'),
+                  const TextSpan(
+                      text: 'Movimientos: ',
+                      style: TextStyle(color: AppColors.lightBlue, fontWeight: FontWeight.w700)),
+                  TextSpan(text: '$total · '),
+                  const TextSpan(
+                      text: 'Se crearán ahora: ',
+                      style: TextStyle(color: AppColors.lightBlue, fontWeight: FontWeight.w700)),
+                  TextSpan(text: '$created viaje${created == 1 ? '' : 's'}'),
+                  if (created < total)
+                    TextSpan(text: '\nLos otros ${total - created} se agregan después.'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+}
+
+/// Link del cliente + notas internas de UN viaje (solo las ve el equipo).
+/// Colapsado por defecto en las tarjetas de movimiento para no alargar la ruta.
+class _InternalFields extends StatefulWidget {
+  final RxString link;
+  final RxString notes;
+  const _InternalFields({required this.link, required this.notes});
+
+  @override
+  State<_InternalFields> createState() => _InternalFieldsState();
+}
+
+class _InternalFieldsState extends State<_InternalFields> {
+  late bool _open = widget.link.value.isNotEmpty || widget.notes.value.isNotEmpty;
+
+  InputDecoration _decoration(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.textLight, fontSize: 13),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.all(12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.fieldBorder),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: () => setState(() => _open = !_open),
+          icon: Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
+          label: const Text('Link y notas internas (opcional)'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.royalBlue,
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 34),
+            alignment: Alignment.centerLeft,
+          ),
+        ),
+        if (_open) ...[
+          const Text(
+            'Solo la ve el equipo interno, no el operador ni el transportista.',
+            style: TextStyle(color: AppColors.textLight, fontSize: 11.5),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: widget.link.value,
+            keyboardType: TextInputType.url,
+            style: const TextStyle(color: AppColors.textDark, fontSize: 13.5),
+            onChanged: (v) => widget.link.value = v,
+            decoration: _decoration('Link del cliente (https://...)'),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: widget.notes.value,
+            maxLines: 2,
+            style: const TextStyle(color: AppColors.textDark, fontSize: 13.5),
+            onChanged: (v) => widget.notes.value = v,
+            decoration: _decoration('Notas internas'),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _TypeChips extends StatelessWidget {
+  final String? value;
+  final ValueChanged<String> onChanged;
+  const _TypeChips({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ChoiceChip(
+              label: 'Cargado', selected: value == 'cargado', onTap: () => onChanged('cargado')),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ChoiceChip(
+              label: 'Vacío', selected: value == 'vacio', onTap: () => onChanged('vacio')),
+        ),
+      ],
+    );
+  }
+}
+
+/// "¿Misma caja del movimiento anterior?" + campos de la otra caja (drop and hook).
+class _MovementBox extends StatelessWidget {
+  final Rxn<bool> same;
+  final RxBool isPt;
+  final RxString number;
+  final Rxn<String> owner;
+  final bool usesOwnTruckboxes;
+
+  const _MovementBox({
+    required this.same,
+    required this.isPt,
+    required this.number,
+    required this.owner,
+    required this.usesOwnTruckboxes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Caja',
+                style: TextStyle(
+                    color: AppColors.navyBlue, fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: _ChoiceChip(
+                    label: 'Misma caja',
+                    selected: same.value == true,
+                    onTap: () {
+                      same.value = true;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ChoiceChip(
+                    label: 'Otra (drop and hook)',
+                    selected: same.value == false,
+                    onTap: () {
+                      same.value = false;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            if (same.value == false) ...[
+              const SizedBox(height: 10),
+              _TruckboxFields(
+                isPt: isPt,
+                number: number,
+                owner: owner,
+                usesOwnTruckboxes: usesOwnTruckboxes,
+              ),
+            ],
+          ],
+        ));
+  }
+}
+
+/// Edición: agrega trayectos después de este viaje (el último es el fin de la
+/// vuelta). Cada uno sale del destino del anterior, pero el origen se puede cambiar.
+class _EditExtraStops extends StatelessWidget {
+  final CircuitTripFormController c;
+  const _EditExtraStops({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return _StepCard(
+      title: 'Agregar trayectos',
+      child: Obx(() => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Salen de ${c.editChainStart?.name ?? '—'} (destino de este viaje). El último trayecto es el fin de la vuelta.',
+                style: const TextStyle(color: AppColors.textMedium, fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              for (var i = 0; i < c.stops.length; i++) _StopNode(c: c, index: i),
+              OutlinedButton.icon(
+                onPressed: c.addStop,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Agregar trayecto'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  foregroundColor: AppColors.royalBlue,
+                  side: const BorderSide(color: AppColors.lightBlue, width: 2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
+          )),
+    );
+  }
+}
+
+class _NextMovementStepOrNothing extends StatelessWidget {
+  final CircuitTripFormController c;
+  const _NextMovementStepOrNothing({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    if (c.isEditing) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [_NextMovementStep(c: c)],
+      ),
+    );
+  }
+}
+
+/// Vuelta abierta: el siguiente movimiento es un intermedio o el fin de la ruta.
+class _NextMovementStep extends StatelessWidget {
+  final CircuitTripFormController c;
+  const _NextMovementStep({required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final next = _StepCard(
+      title: 'Siguiente movimiento',
+      child: Obx(() {
+        final finDestination = c.legResolution.value?.destination?.name ?? '—';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Sale de',
+                style: TextStyle(
+                    color: AppColors.textMedium, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            _InfoChip(c.selectedReturnOrigin.value?.name ?? '—'),
+            const SizedBox(height: 14),
+            const Text('Destino del movimiento',
+                style: TextStyle(
+                    color: AppColors.navyBlue, fontSize: 13.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(
+              'Por defecto regresa a $finDestination (inicio del circuito) y cierra la ruta. '
+              'Si eliges otro destino, la ruta sigue abierta.',
+              style: const TextStyle(color: AppColors.textMedium, fontSize: 12.5),
+            ),
+            const SizedBox(height: 8),
+            c.isLoadingMovementDestinations.value
+                ? const _InlineLoader()
+                : _Dropdown<AddressOption>(
+                    value: c.movementDestinationOptions
+                        .firstWhereOrNull((o) => o.id == c.movementDestinationShown?.id),
+                    hint: 'Destino del movimiento',
+                    items: c.movementDestinationOptions,
+                    itemLabel: (o) => o.name,
+                    onChanged: c.pickMovementDestination,
+                  ),
+            const SizedBox(height: 14),
+            const Text('Tipo de viaje',
+                style: TextStyle(
+                    color: AppColors.navyBlue, fontSize: 13.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            _TypeChips(value: c.movementTypeTrip.value, onChanged: c.selectMovementType),
+          ],
+        );
+      }),
+    );
+
+    return next;
+  }
+}
+
+/// Movimientos ya creados de la vuelta abierta, como línea de tiempo.
+class _RoundHistory extends StatelessWidget {
+  final CircuitTripFormController c;
+  final List<RoundMovement> movements;
+  const _RoundHistory({required this.c, required this.movements});
+
+  @override
+  Widget build(BuildContext context) {
+    return _StepCard(
+      title: 'Vuelta del circuito',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final m in movements)
+            _TimelineNode(
+              kind: _DotKind.middle,
+              title:
+                  '${m.position} · ${m.role == 'outbound' ? 'Ida' : (m.role == 'return' ? 'Fin' : 'Movimiento')}',
+              tag: m.statusLabel,
+              actions: (m.canRemove && m.tripId != null)
+                  ? _MiniIcon(
+                      Icons.delete_outline,
+                      () => _confirmRemoveMovement(context, c, m.tripId!, m.position),
+                      danger: true,
+                    )
+                  : null,
+              child: Text(
+                '${m.origin ?? '—'} → ${m.destination ?? '—'} · ${m.typeTrip == 'vacio' ? 'Vacío' : 'Cargado'} · Caja ${m.truckboxNum ?? 'PT'}',
+                style: const TextStyle(color: AppColors.textMedium, fontSize: 12.5),
+              ),
+            ),
+          const _TimelineNode(
+            kind: _DotKind.end,
+            title: 'Fin del circuito',
+            tag: 'Pendiente',
+            child: Text('Lo define quien registra el último movimiento.',
+                style: TextStyle(color: AppColors.textMedium, fontSize: 12.5)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CommentsStep extends StatelessWidget {
   final CircuitTripFormController c;
   const _CommentsStep({required this.c});
@@ -465,7 +1403,8 @@ class _InternalInfoStep extends StatelessWidget {
           const SizedBox(height: 10),
           const Text(
             'Link del cliente (documentos/evidencias)',
-            style: TextStyle(color: AppColors.textDark, fontSize: 12.5, fontWeight: FontWeight.w600),
+            style:
+                TextStyle(color: AppColors.textDark, fontSize: 12.5, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           TextFormField(
@@ -487,7 +1426,8 @@ class _InternalInfoStep extends StatelessWidget {
           const SizedBox(height: 12),
           const Text(
             'Notas internas',
-            style: TextStyle(color: AppColors.textDark, fontSize: 12.5, fontWeight: FontWeight.w600),
+            style:
+                TextStyle(color: AppColors.textDark, fontSize: 12.5, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           TextFormField(
@@ -531,7 +1471,8 @@ class _TruckboxStep extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _ChoiceChip(
-                      label: '¿Misma caja de la ida? (${leg.outboundTruckboxNum ?? 'PT'})',
+                      label:
+                          '¿Misma caja del movimiento anterior? (${leg.outboundTruckboxNum ?? 'PT'})',
                       selected: c.sameAsOutboundTruckbox.value == true,
                       onTap: () => c.setSameAsOutboundTruckbox(true),
                     ),
@@ -566,41 +1507,6 @@ class _TruckboxStep extends StatelessWidget {
               owner: c.truckboxOwner,
               usesOwnTruckboxes: c.usesOwnTruckboxes,
             ),
-            if (c.typeTrip.value == 'vacio') ...[
-              const SizedBox(height: 16),
-              const Text('¿El regreso es con la misma caja?',
-                  style: TextStyle(
-                      color: AppColors.navyBlue, fontSize: 13.5, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ChoiceChip(
-                      label: 'Sí',
-                      selected: c.autoReturnSameTruckbox.value == true,
-                      onTap: () => c.setAutoReturnSameTruckbox(true),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _ChoiceChip(
-                      label: 'No (drop and hook)',
-                      selected: c.autoReturnSameTruckbox.value == false,
-                      onTap: () => c.setAutoReturnSameTruckbox(false),
-                    ),
-                  ),
-                ],
-              ),
-              if (c.autoReturnSameTruckbox.value == false) ...[
-                const SizedBox(height: 12),
-                _TruckboxFields(
-                  isPt: c.returnTruckboxIsPt,
-                  number: c.returnTruckboxNumber,
-                  owner: c.returnTruckboxOwner,
-                  usesOwnTruckboxes: c.usesOwnTruckboxes,
-                ),
-              ],
-            ],
           ],
         );
       }),
@@ -774,8 +1680,8 @@ class _AdditionalMaterialsStep extends StatelessWidget {
                                         },
                                       ),
                                       Expanded(
-                                        child: Text(option.name,
-                                            style: const TextStyle(fontSize: 13)),
+                                        child:
+                                            Text(option.name, style: const TextStyle(fontSize: 13)),
                                       ),
                                     ],
                                   ),
@@ -806,8 +1712,7 @@ class _AdditionalMaterialsStep extends StatelessWidget {
                                 },
                               ),
                               const Expanded(
-                                child: Text('Otro, especificar',
-                                    style: TextStyle(fontSize: 13)),
+                                child: Text('Otro, especificar', style: TextStyle(fontSize: 13)),
                               ),
                             ],
                           ),
@@ -940,10 +1845,10 @@ class _StepCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Sx.cardRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: AppColors.royalBlue.withValues(alpha: 0.08),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -1058,9 +1963,8 @@ class _DropdownState<T> extends State<_Dropdown<T>> {
               ),
             ),
           ),
-          searchMatchFn: (item, searchValue) => itemLabel(item.value as T)
-              .toLowerCase()
-              .contains(searchValue.toLowerCase()),
+          searchMatchFn: (item, searchValue) =>
+              itemLabel(item.value as T).toLowerCase().contains(searchValue.toLowerCase()),
         ),
       ),
     );
@@ -1097,21 +2001,22 @@ class _ChoiceChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.royalBlue.withValues(alpha: 0.12) : AppColors.fieldFill,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.royalBlue : AppColors.fieldBorder),
+          color: selected ? AppColors.royalBlue : AppColors.fieldFill,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: selected ? AppColors.royalBlue : AppColors.fieldBorder, width: 1.5),
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: selected ? AppColors.royalBlue : AppColors.textMedium,
+            color: selected ? Colors.white : AppColors.textMedium,
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -1134,7 +2039,8 @@ class _InfoChip extends StatelessWidget {
         border: Border.all(color: AppColors.lightBlue),
       ),
       child: Text(text,
-          style: const TextStyle(color: AppColors.royalBlue, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          style: const TextStyle(
+              color: AppColors.royalBlue, fontSize: 12.5, fontWeight: FontWeight.w600)),
     );
   }
 }

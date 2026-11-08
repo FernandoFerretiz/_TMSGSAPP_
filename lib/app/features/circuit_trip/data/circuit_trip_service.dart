@@ -4,13 +4,31 @@ import '../models/circuit_trip_models.dart';
 class CircuitTripSubmitResult {
   final int? outboundTripId;
   final int? returnTripId;
+  final List<int> intermediateTripIds;
 
-  const CircuitTripSubmitResult({this.outboundTripId, this.returnTripId});
+  const CircuitTripSubmitResult({
+    this.outboundTripId,
+    this.returnTripId,
+    this.intermediateTripIds = const [],
+  });
 
-  factory CircuitTripSubmitResult.fromJson(Map<String, dynamic> json) =>
-      CircuitTripSubmitResult(
+  factory CircuitTripSubmitResult.fromJson(Map<String, dynamic> json) => CircuitTripSubmitResult(
         outboundTripId: json['outbound_trip_id'] as int?,
         returnTripId: json['return_trip_id'] as int?,
+        intermediateTripIds:
+            (json['intermediate_trip_ids'] as List? ?? []).map((e) => (e as num).toInt()).toList(),
+      );
+}
+
+class MissingTruckbox {
+  final String number;
+  final String? owner; // 'client' | 'transporter' | null
+
+  const MissingTruckbox({required this.number, this.owner});
+
+  factory MissingTruckbox.fromJson(Map<String, dynamic> json) => MissingTruckbox(
+        number: (json['number'] ?? '').toString(),
+        owner: json['owner']?.toString(),
       );
 }
 
@@ -34,9 +52,7 @@ class CircuitTripService {
       queryParameters: {'client_id': clientId},
     );
     final data = (response.data['data'] as List? ?? []);
-    return data
-        .map((e) => ClientCircuitOption.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return data.map((e) => ClientCircuitOption.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<List<CircuitOperatorOption>> getOperators({
@@ -48,9 +64,7 @@ class CircuitTripService {
       queryParameters: {'client_id': clientId, 'client_circuit_id': clientCircuitId},
     );
     final data = (response.data['data'] as List? ?? []);
-    return data
-        .map((e) => CircuitOperatorOption.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return data.map((e) => CircuitOperatorOption.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<OperatorLegResolution> resolveOperator({
@@ -86,12 +100,9 @@ class CircuitTripService {
   }
 
   Future<List<AdditionalMaterialOption>> getAdditionalMaterials() async {
-    final response =
-        await _apiClient.dio.get('/api/mobile/circuit-trips/additional-materials');
+    final response = await _apiClient.dio.get('/api/mobile/circuit-trips/additional-materials');
     final data = (response.data['data'] as List? ?? []);
-    return data
-        .map((e) => AdditionalMaterialOption.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return data.map((e) => AdditionalMaterialOption.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<int> getReturnOriginRouteType({
@@ -110,6 +121,26 @@ class CircuitTripService {
     return (response.data['data']['route_type_id'] as num).toInt();
   }
 
+  /// Cajas (de las indicadas) que aún no están registradas.
+  Future<List<MissingTruckbox>> checkTruckboxes({
+    required int clientId,
+    required int transporterId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final response = await _apiClient.dio.post(
+      '/api/mobile/truckboxes/check',
+      data: {'client_id': clientId, 'transporter_id': transporterId, 'items': items},
+    );
+    return (response.data['missing'] as List? ?? [])
+        .map((e) => MissingTruckbox.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Registra una caja con sus datos (placas, NIV, año, marca: todos obligatorios).
+  Future<void> registerTruckbox(Map<String, dynamic> payload) async {
+    await _apiClient.dio.post('/api/mobile/truckboxes', data: payload);
+  }
+
   Future<CircuitTripSubmitResult> submit(Map<String, dynamic> payload) async {
     final response = await _apiClient.dio.post(
       '/api/mobile/circuit-trips',
@@ -125,6 +156,12 @@ class CircuitTripService {
   Future<TripEditData> getForEdit(int tripId) async {
     final response = await _apiClient.dio.get('/api/mobile/circuit-trips/$tripId');
     return TripEditData.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  /// Elimina un movimiento intermedio o el fin; el siguiente pasa a salir del
+  /// destino del anterior (ver CircuitTripFormService::removeMovement).
+  Future<void> removeMovement(int tripId) async {
+    await _apiClient.dio.delete('/api/mobile/circuit-trips/$tripId/movement');
   }
 
   Future<void> update(int tripId, Map<String, dynamic> payload) async {
